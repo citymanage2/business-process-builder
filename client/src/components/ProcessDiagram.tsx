@@ -119,12 +119,21 @@ export function ProcessDiagram({ steps, roles, stages, branches = [] }: ProcessD
 
   const initialEdges: Edge[] = useMemo(() => {
     const edges: Edge[] = [];
+    const edgeIds = new Set<string>();
     
     steps.forEach((step, index) => {
       if (index < steps.length - 1) {
         const nextStep = steps[index + 1];
+        const edgeId = `e-${step.id}-${nextStep.id}`;
+        
+        // Skip if this edge already exists
+        if (edgeIds.has(edgeId)) {
+          return;
+        }
+        edgeIds.add(edgeId);
+        
         edges.push({
-          id: `e-${step.id}-${nextStep.id}`,
+          id: edgeId,
           source: step.id,
           target: nextStep.id,
           type: "smoothstep",
@@ -141,40 +150,49 @@ export function ProcessDiagram({ steps, roles, stages, branches = [] }: ProcessD
       }
     });
 
-    branches.forEach((branch) => {
-      edges.push({
-        id: `e-${branch.stepId}-${branch.trueNext}`,
-        source: branch.stepId,
-        target: branch.trueNext,
-        type: "smoothstep",
-        animated: true,
-        label: "✓",
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          color: "#10b981",
-        },
-        style: {
-          stroke: "#10b981",
-          strokeWidth: 2,
-        },
-      });
+    branches.forEach((branch, branchIndex) => {
+      const trueEdgeId = `e-branch-${branchIndex}-true-${branch.stepId}-${branch.trueNext}`;
+      const falseEdgeId = `e-branch-${branchIndex}-false-${branch.stepId}-${branch.falseNext}`;
+      
+      if (!edgeIds.has(trueEdgeId)) {
+        edgeIds.add(trueEdgeId);
+        edges.push({
+          id: trueEdgeId,
+          source: branch.stepId,
+          target: branch.trueNext,
+          type: "smoothstep",
+          animated: true,
+          label: "✓",
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: "#10b981",
+          },
+          style: {
+            stroke: "#10b981",
+            strokeWidth: 2,
+          },
+        });
+      }
 
-      edges.push({
-        id: `e-${branch.stepId}-${branch.falseNext}`,
-        source: branch.stepId,
-        target: branch.falseNext,
-        type: "smoothstep",
-        animated: true,
-        label: "✗",
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          color: "#ef4444",
-        },
-        style: {
-          stroke: "#ef4444",
-          strokeWidth: 2,
-        },
-      });
+      if (!edgeIds.has(falseEdgeId)) {
+        edgeIds.add(falseEdgeId);
+        edges.push({
+          id: falseEdgeId,
+          source: branch.stepId,
+          target: branch.falseNext,
+          type: "smoothstep",
+          animated: true,
+          label: "✗",
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: "#ef4444",
+          },
+          style: {
+            stroke: "#ef4444",
+            strokeWidth: 2,
+          },
+        });
+      }
     });
 
     return edges;
