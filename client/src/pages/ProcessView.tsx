@@ -14,23 +14,18 @@ export default function ProcessView() {
   const processId = params?.id ? parseInt(params.id) : 0;
 
   const { data: process, isLoading } = trpc.processes.get.useQuery({ id: processId });
-  const [recommendationsGenerated, setRecommendationsGenerated] = useState(false);
+
+  const recommendationsQuery = trpc.recommendations.list.useQuery({ processId });
 
   const generateRecommendationsMutation = trpc.recommendations.generate.useMutation({
     onSuccess: () => {
       toast.success("Рекомендации сгенерированы");
-      setRecommendationsGenerated(true);
       recommendationsQuery.refetch();
     },
     onError: (error) => {
       toast.error(`Ошибка: ${error.message}`);
     },
   });
-
-  const recommendationsQuery = trpc.recommendations.list.useQuery(
-    { processId },
-    { enabled: recommendationsGenerated }
-  );
 
   const handleGenerateRecommendations = () => {
     generateRecommendationsMutation.mutate({ processId });
@@ -90,7 +85,7 @@ export default function ProcessView() {
                 <Badge variant="outline">{process.endEvent}</Badge>
               </div>
             </div>
-            {!recommendationsGenerated && (
+            {(!recommendationsQuery.data || recommendationsQuery.data.length === 0) && (
               <Button
                 onClick={handleGenerateRecommendations}
                 disabled={generateRecommendationsMutation.isPending}
@@ -208,7 +203,7 @@ export default function ProcessView() {
           </TabsContent>
 
           <TabsContent value="recommendations" className="mt-6">
-            {!recommendationsGenerated ? (
+            {!recommendationsQuery.data || recommendationsQuery.data.length === 0 ? (
               <Card>
                 <CardHeader className="text-center">
                   <Sparkles className="w-12 h-12 mx-auto mb-4 text-primary" />

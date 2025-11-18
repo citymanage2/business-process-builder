@@ -477,6 +477,42 @@ function ProcessDiagramInner({ steps, roles, stages, branches = [] }: ProcessDia
               </button>
             )}
           </Panel>
+
+          <Panel
+            position="bottom-right"
+            className="bg-background border rounded-lg p-3 shadow-lg"
+          >
+            <div className="text-sm font-semibold mb-3">Легенда типов блоков</div>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="w-16 h-8 bg-blue-100 border-2 border-blue-500 rounded flex items-center justify-center">
+                  <span className="text-[8px] font-semibold text-gray-800">Действие</span>
+                </div>
+                <span className="text-xs text-muted-foreground">Прямоугольник</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div 
+                  className="w-16 h-8 bg-yellow-100 border-2 border-yellow-600 flex items-center justify-center"
+                  style={{ clipPath: "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)" }}
+                >
+                  <span className="text-[8px] font-semibold text-gray-800">Решение</span>
+                </div>
+                <span className="text-xs text-muted-foreground">Ромб</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-16 h-8 bg-green-100 border-2 border-green-600 rounded flex items-center justify-center">
+                  <span className="text-[8px] font-semibold text-gray-800">Результат</span>
+                </div>
+                <span className="text-xs text-muted-foreground">Скругленный</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-16 h-8 bg-purple-100 border-2 border-purple-600 rounded-full flex items-center justify-center">
+                  <span className="text-[8px] font-semibold text-gray-800">Время</span>
+                </div>
+                <span className="text-xs text-muted-foreground">Овал</span>
+              </div>
+            </div>
+          </Panel>
         </ReactFlow>
       </div>
 
