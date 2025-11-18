@@ -73,38 +73,40 @@ const ProcessStepNode: React.FC<{ data: any }> = ({ data }) => {
         backgroundColor: "#ffffff",
         border: "2px solid #666",
         borderRadius: "6px",
-        padding: "12px",
-        fontSize: "11px",
+        padding: "10px",
+        fontSize: "10px",
         color: "#000",
-        overflow: "hidden",
+        overflow: "auto",
         boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
       }}
     >
-      <div style={{ fontWeight: "bold", marginBottom: "6px", fontSize: "12px" }}>
+      <div style={{ fontWeight: "bold", marginBottom: "4px", fontSize: "11px" }}>
         {data.order}. {data.label}
       </div>
-      {data.role && (
-        <div style={{ fontSize: "10px", color: "#666", marginBottom: "4px" }}>
-          👤 {data.role}
+      {data.responsible && (
+        <div style={{ fontSize: "9px", color: "#666", marginBottom: "3px" }}>
+          👤 {data.responsible}
         </div>
       )}
       {data.duration && (
-        <div style={{ fontSize: "10px", color: "#666", marginBottom: "6px" }}>
+        <div style={{ fontSize: "9px", color: "#666", marginBottom: "4px" }}>
           ⏱ {data.duration}
         </div>
       )}
-      {data.mop && (
-        <div style={{ fontSize: "9px", color: "#444", lineHeight: "1.3" }}>
-          <div style={{ fontWeight: "600", marginBottom: "3px" }}>МОП:</div>
-          {data.mop.materials && data.mop.materials.length > 0 && (
-            <div>📦 {data.mop.materials.join(", ")}</div>
-          )}
-          {data.mop.equipment && data.mop.equipment.length > 0 && (
-            <div>🔧 {data.mop.equipment.join(", ")}</div>
-          )}
-          {data.mop.personnel && data.mop.personnel.length > 0 && (
-            <div>👥 {data.mop.personnel.join(", ")}</div>
-          )}
+      {data.informationSystems && data.informationSystems.length > 0 && (
+        <div style={{ fontSize: "8px", color: "#444", marginBottom: "4px" }}>
+          <div style={{ fontWeight: "600", marginBottom: "2px" }}>ИС:</div>
+          {data.informationSystems.map((is: any, i: number) => (
+            <div key={i}>💻 {is.name}</div>
+          ))}
+        </div>
+      )}
+      {data.substeps && data.substeps.length > 0 && (
+        <div style={{ fontSize: "8px", color: "#444", marginBottom: "4px", lineHeight: "1.2" }}>
+          <div style={{ fontWeight: "600", marginBottom: "2px" }}>Подэтапы:</div>
+          {data.substeps.slice(0, 3).map((substep: string, i: number) => (
+            <div key={i}>{i + 1}. {substep.length > 40 ? substep.substring(0, 40) + "..." : substep}</div>
+          ))}
         </div>
       )}
     </div>
@@ -210,20 +212,22 @@ function ProcessDiagramInner({ steps, roles, stages, branches }: ProcessDiagramP
           label: step.name,
           order: globalIndex + 1,
           role: roleInfo.name,
+          responsible: step.responsible,
           duration: step.duration || step.timeEstimate,
+          description: step.description,
+          substeps: step.substeps || [],
+          informationSystems: step.informationSystems || [],
           mop: step.mop || {
             materials: step.materials || [],
             equipment: step.equipment || [],
             personnel: step.personnel || [],
           },
         },
-        position: { x, y },
+        position: { x: roleInfo.index * COLUMN_WIDTH + 10, y: HEADER_HEIGHT + stepIndexInRole * (STEP_HEIGHT + STEP_SPACING) + 20 },
         style: {
           width: COLUMN_WIDTH - 20,
           height: STEP_HEIGHT,
         },
-        parentNode: `swimlane-${step.roleId}`,
-        extent: "parent" as const,
         draggable: true,
       });
     });
@@ -496,9 +500,9 @@ function ProcessDiagramInner({ steps, roles, stages, branches }: ProcessDiagramP
       </div>
 
       {selectedStep && (
-        <div className="w-80 border rounded-lg p-4 bg-background overflow-y-auto max-h-[800px]">
+        <div className="w-96 border rounded-lg p-4 bg-background overflow-y-auto max-h-[800px]">
           <h3 className="font-bold text-lg mb-4">Детали шага</h3>
-          <div className="space-y-3">
+          <div className="space-y-4">
             <div>
               <div className="text-sm font-semibold text-muted-foreground">Название</div>
               <div className="text-sm">{selectedStep.name}</div>
@@ -509,17 +513,86 @@ function ProcessDiagramInner({ steps, roles, stages, branches }: ProcessDiagramP
                 <div className="text-sm">{selectedStep.description}</div>
               </div>
             )}
+            {selectedStep.responsible && (
+              <div>
+                <div className="text-sm font-semibold text-muted-foreground">Ответственный</div>
+                <div className="text-sm">{selectedStep.responsible}</div>
+              </div>
+            )}
             {(selectedStep.duration || selectedStep.timeEstimate) && (
               <div>
-                <div className="text-sm font-semibold text-muted-foreground">Время</div>
+                <div className="text-sm font-semibold text-muted-foreground">Время выполнения</div>
                 <div className="text-sm">{selectedStep.duration || selectedStep.timeEstimate}</div>
               </div>
             )}
+            {selectedStep.substeps && selectedStep.substeps.length > 0 && (
+              <div>
+                <div className="text-sm font-semibold text-muted-foreground">Подэтапы</div>
+                <ol className="text-sm list-decimal list-inside space-y-1">
+                  {selectedStep.substeps.map((substep: string, i: number) => (
+                    <li key={i}>{substep}</li>
+                  ))}
+                </ol>
+              </div>
+            )}
+            {selectedStep.informationSystems && selectedStep.informationSystems.length > 0 && (
+              <div>
+                <div className="text-sm font-semibold text-muted-foreground">Информационные системы</div>
+                <div className="space-y-2">
+                  {selectedStep.informationSystems.map((is: any, i: number) => (
+                    <div key={i} className="text-sm border-l-2 border-primary pl-2">
+                      <div className="font-semibold">{is.name}</div>
+                      {is.purpose && <div className="text-xs text-muted-foreground">{is.purpose}</div>}
+                      {is.actions && is.actions.length > 0 && (
+                        <ul className="text-xs list-disc list-inside mt-1">
+                          {is.actions.map((action: string, j: number) => (
+                            <li key={j}>{action}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {selectedStep.input && (
+              <div>
+                <div className="text-sm font-semibold text-muted-foreground">Вход</div>
+                <div className="text-sm">{selectedStep.input}</div>
+              </div>
+            )}
+            {selectedStep.output && (
+              <div>
+                <div className="text-sm font-semibold text-muted-foreground">Выход</div>
+                <div className="text-sm">{selectedStep.output}</div>
+              </div>
+            )}
+            {selectedStep.regulations && selectedStep.regulations.length > 0 && (
+              <div>
+                <div className="text-sm font-semibold text-muted-foreground">Регламенты</div>
+                <ul className="text-sm list-disc list-inside">
+                  {selectedStep.regulations.map((r: string, i: number) => (
+                    <li key={i}>{r}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {selectedStep.documents && selectedStep.documents.length > 0 && (
+              <div>
+                <div className="text-sm font-semibold text-muted-foreground">Документы</div>
+                <ul className="text-sm list-disc list-inside">
+                  {selectedStep.documents.map((d: string, i: number) => (
+                    <li key={i}>{d}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {selectedStep.mop && (
-              <>
+              <div>
+                <div className="text-sm font-semibold text-muted-foreground mb-2">МОП</div>
                 {selectedStep.mop.materials && selectedStep.mop.materials.length > 0 && (
-                  <div>
-                    <div className="text-sm font-semibold text-muted-foreground">Материалы</div>
+                  <div className="mb-2">
+                    <div className="text-xs font-semibold text-muted-foreground">Материалы</div>
                     <ul className="text-sm list-disc list-inside">
                       {selectedStep.mop.materials.map((m: string, i: number) => (
                         <li key={i}>{m}</li>
@@ -528,8 +601,8 @@ function ProcessDiagramInner({ steps, roles, stages, branches }: ProcessDiagramP
                   </div>
                 )}
                 {selectedStep.mop.equipment && selectedStep.mop.equipment.length > 0 && (
-                  <div>
-                    <div className="text-sm font-semibold text-muted-foreground">Оборудование</div>
+                  <div className="mb-2">
+                    <div className="text-xs font-semibold text-muted-foreground">Оборудование</div>
                     <ul className="text-sm list-disc list-inside">
                       {selectedStep.mop.equipment.map((e: string, i: number) => (
                         <li key={i}>{e}</li>
@@ -539,7 +612,7 @@ function ProcessDiagramInner({ steps, roles, stages, branches }: ProcessDiagramP
                 )}
                 {selectedStep.mop.personnel && selectedStep.mop.personnel.length > 0 && (
                   <div>
-                    <div className="text-sm font-semibold text-muted-foreground">Персонал</div>
+                    <div className="text-xs font-semibold text-muted-foreground">Персонал</div>
                     <ul className="text-sm list-disc list-inside">
                       {selectedStep.mop.personnel.map((p: string, i: number) => (
                         <li key={i}>{p}</li>
@@ -547,7 +620,7 @@ function ProcessDiagramInner({ steps, roles, stages, branches }: ProcessDiagramP
                     </ul>
                   </div>
                 )}
-              </>
+              </div>
             )}
           </div>
         </div>
