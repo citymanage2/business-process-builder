@@ -12,6 +12,8 @@ import ReactFlow, {
   useReactFlow,
 } from "reactflow";
 import "reactflow/dist/style.css";
+import { ChevronDown, ChevronUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface ProcessDiagramProps {
   steps: any[];
@@ -124,6 +126,7 @@ function ProcessDiagramInner({ steps, roles, stages, branches }: ProcessDiagramP
   const [selectedRoles, setSelectedRoles] = useState<Set<string>>(
     new Set(roles.map((r) => r.id))
   );
+  const [filterCollapsed, setFilterCollapsed] = useState(false);
 
   // Создаем map ролей для быстрого доступа
   const roleMap = useMemo(() => {
@@ -264,12 +267,12 @@ function ProcessDiagramInner({ steps, roles, stages, branches }: ProcessDiagramP
           target: sortedSteps[i + 1].id,
           type: "smoothstep",
           animated: false,
-          style: { stroke: "#666", strokeWidth: 2 },
+          style: { stroke: "#333", strokeWidth: 3 },
           markerEnd: {
             type: MarkerType.ArrowClosed,
-            width: 20,
-            height: 20,
-            color: "#666",
+            width: 25,
+            height: 25,
+            color: "#333",
           },
         });
         edgeSet.add(edgeId);
@@ -445,38 +448,48 @@ function ProcessDiagramInner({ steps, roles, stages, branches }: ProcessDiagramP
 
           <Panel
             position="top-left"
-            className="bg-background border rounded-lg p-3 shadow-lg max-w-xs"
+            className="bg-background border rounded-lg shadow-lg max-w-xs"
           >
-            <div className="text-sm font-semibold mb-2">Фильтр по ролям</div>
-            <div className="space-y-1.5">
-              {roles.map((role) => (
-                <label
-                  key={role.id}
-                  className="flex items-center gap-2 cursor-pointer hover:bg-accent/50 p-1.5 rounded transition"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedRoles.has(role.id)}
-                    onChange={() => toggleRole(role.id)}
-                    className="rounded border-gray-300"
-                  />
-                  <span className="text-xs">{role.name}</span>
-                </label>
-              ))}
-            </div>
-            <button
-              onClick={() => fitView({ duration: 300 })}
-              className="w-full mt-3 px-3 py-1.5 text-xs bg-secondary text-secondary-foreground rounded hover:bg-secondary/80 transition"
+            <div 
+              className="flex items-center justify-between p-3 cursor-pointer hover:bg-accent/30 transition"
+              onClick={() => setFilterCollapsed(!filterCollapsed)}
             >
-              🔍 Вместить всё
-            </button>
-            {selectedNode && (
-              <button
-                onClick={onDeleteNode}
-                className="w-full mt-2 px-3 py-1.5 text-xs bg-destructive text-destructive-foreground rounded hover:bg-destructive/90 transition"
-              >
-                🗑 Удалить блок
-              </button>
+              <div className="text-sm font-semibold">Фильтр по ролям</div>
+              {filterCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+            </div>
+            {!filterCollapsed && (
+              <div className="p-3 pt-0">
+                <div className="space-y-1.5 mb-3">
+                  {roles.map((role) => (
+                    <label
+                      key={role.id}
+                      className="flex items-center gap-2 cursor-pointer hover:bg-accent/50 p-1.5 rounded transition"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedRoles.has(role.id)}
+                        onChange={() => toggleRole(role.id)}
+                        className="rounded border-gray-300"
+                      />
+                      <span className="text-xs">{role.name}</span>
+                    </label>
+                  ))}
+                </div>
+                <button
+                  onClick={() => fitView({ duration: 300 })}
+                  className="w-full px-3 py-1.5 text-xs bg-secondary text-secondary-foreground rounded hover:bg-secondary/80 transition"
+                >
+                  🔍 Вместить всё
+                </button>
+                {selectedNode && (
+                  <button
+                    onClick={onDeleteNode}
+                    className="w-full mt-2 px-3 py-1.5 text-xs bg-destructive text-destructive-foreground rounded hover:bg-destructive/90 transition"
+                  >
+                    🗑 Удалить блок
+                  </button>
+                )}
+              </div>
             )}
           </Panel>
 
