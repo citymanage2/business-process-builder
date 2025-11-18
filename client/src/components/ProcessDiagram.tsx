@@ -34,9 +34,9 @@ const PASTEL_COLORS = [
   "#CFD8DC", // светло-серый
 ];
 
-const COLUMN_WIDTH = 280;
-const STEP_HEIGHT = 120;
-const STEP_SPACING = 60;
+const COLUMN_WIDTH = 320;
+const STEP_HEIGHT = 160;
+const STEP_SPACING = 40;
 const HEADER_HEIGHT = 60;
 
 // Кастомный компонент для swimlane колонки
@@ -72,20 +72,20 @@ const SwimlaneColumn: React.FC<{ data: any }> = ({ data }) => {
 // Кастомный компонент для блока процесса с формами блок-схем
 const ProcessStepNode: React.FC<{ data: any }> = ({ data }) => {
   const step = data.step;
-  const shapeType = step.shapeType || "rectangle"; // rectangle, diamond, oval, parallelogram
+  const shapeType = step.shapeType || step.type || "rectangle"; // rectangle, diamond, oval, parallelogram
   
   // Определяем стили в зависимости от типа фигуры
   const getShapeStyle = () => {
     const baseStyle = {
-      padding: "12px",
+      padding: "14px",
       fontSize: "11px",
       color: "#000",
       border: "2px solid #333",
       backgroundColor: "#fff",
-      minHeight: "80px",
+      minHeight: "120px",
       display: "flex",
       flexDirection: "column" as const,
-      justifyContent: "center",
+      justifyContent: "flex-start",
       alignItems: "center",
       textAlign: "center" as const,
       wordWrap: "break-word" as const,
@@ -118,8 +118,8 @@ const ProcessStepNode: React.FC<{ data: any }> = ({ data }) => {
       default: // rectangle - Процесс/Действие
         return {
           ...baseStyle,
-          width: "200px",
-          minHeight: "80px",
+          width: "260px",
+          minHeight: "120px",
           borderRadius: "4px",
         };
     }
@@ -144,9 +144,19 @@ const ProcessStepNode: React.FC<{ data: any }> = ({ data }) => {
   return (
     <div style={getShapeStyle()}>
       <div style={getContentStyle()}>
-        <div style={{ fontWeight: "bold", marginBottom: "4px" }}>
-          {step.order}. {step.title}
+        <div style={{ fontWeight: "bold", marginBottom: "6px", fontSize: "12px" }}>
+          {step.order}. {step.name || step.title}
         </div>
+        {step.description && (
+          <div style={{ fontSize: "9px", color: "#555", marginTop: "4px", lineHeight: "1.4", maxWidth: "240px" }}>
+            {step.description.substring(0, 120)}{step.description.length > 120 ? '...' : ''}
+          </div>
+        )}
+        {step.responsible && (
+          <div style={{ fontSize: "9px", color: "#0066cc", marginTop: "6px", fontStyle: "italic" }}>
+            👤 {step.responsible}
+          </div>
+        )}
         {step.duration && (
           <div style={{ fontSize: "9px", color: "#666", marginTop: "4px" }}>
             ⏱ {step.duration}
@@ -240,7 +250,7 @@ function ProcessDiagramInner({ steps = [], roles = [], stages = [], branches = [
       const stepIndexInRole = roleStepCounts.get(step.roleId) || 0;
       roleStepCounts.set(step.roleId, stepIndexInRole + 1);
 
-      const x = roleInfo.index * COLUMN_WIDTH + (COLUMN_WIDTH - 200) / 2;
+      const x = roleInfo.index * COLUMN_WIDTH + (COLUMN_WIDTH - 260) / 2;
       const y = HEADER_HEIGHT + 40 + stepIndexInRole * (STEP_HEIGHT + STEP_SPACING);
 
       nodes.push({
