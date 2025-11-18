@@ -10,6 +10,7 @@ import ReactFlow, {
   MarkerType,
   useReactFlow,
   Panel,
+  ReactFlowProvider,
 } from "reactflow";
 import "reactflow/dist/style.css";
 
@@ -61,7 +62,7 @@ const ROLE_COLORS: Record<string, string> = {
   role_5: "#e0e7ff",
 };
 
-export function ProcessDiagram({ steps, roles, stages, branches = [] }: ProcessDiagramProps) {
+function ProcessDiagramInner({ steps, roles, stages, branches = [] }: ProcessDiagramProps) {
   const [selectedRoles, setSelectedRoles] = useState<Set<string>>(new Set(roles.map(r => r.id)));
   const { fitView } = useReactFlow();
   
@@ -349,5 +350,13 @@ export function ProcessDiagram({ steps, roles, stages, branches = [] }: ProcessD
         </div>
       </div>
     </div>
+  );
+}
+
+export function ProcessDiagram(props: ProcessDiagramProps) {
+  return (
+    <ReactFlowProvider>
+      <ProcessDiagramInner {...props} />
+    </ReactFlowProvider>
   );
 }
