@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ProcessDiagram } from "@/components/ProcessDiagram";
+import ProcessDiagram from "@/components/ProcessDiagram";
 import { trpc } from "@/lib/trpc";
 import { Loader2, Sparkles, TrendingUp, AlertTriangle, Target } from "lucide-react";
 import { toast } from "sonner";

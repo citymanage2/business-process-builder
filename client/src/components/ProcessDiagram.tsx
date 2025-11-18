@@ -13,7 +13,6 @@ import ReactFlow, {
 } from "reactflow";
 import "reactflow/dist/style.css";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 interface ProcessDiagramProps {
   steps: any[];
@@ -22,7 +21,7 @@ interface ProcessDiagramProps {
   branches: any[];
 }
 
-// Пастельные цвета для колонок ролей (как в PDF)
+// Пастельные цвета для ролей
 const PASTEL_COLORS = [
   "#E3F2FD", // светло-голубой
   "#FFF9C4", // светло-желтый
@@ -35,9 +34,9 @@ const PASTEL_COLORS = [
   "#CFD8DC", // светло-серый
 ];
 
-const COLUMN_WIDTH = 250;
-const STEP_HEIGHT = 180;
-const STEP_SPACING = 40;
+const COLUMN_WIDTH = 280;
+const STEP_HEIGHT = 120;
+const STEP_SPACING = 60;
 const HEADER_HEIGHT = 60;
 
 // Кастомный компонент для swimlane колонки
@@ -50,67 +49,110 @@ const SwimlaneColumn: React.FC<{ data: any }> = ({ data }) => {
         backgroundColor: data.color,
         border: "2px solid #999",
         borderRadius: "8px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontWeight: "bold",
-        fontSize: "14px",
-        color: "#333",
         padding: "8px",
-        textAlign: "center",
       }}
     >
-      {data.label}
+      <div
+        style={{
+          fontWeight: "bold",
+          fontSize: "14px",
+          textAlign: "center",
+          padding: "8px",
+          backgroundColor: "rgba(255,255,255,0.8)",
+          borderRadius: "4px",
+          marginBottom: "8px",
+        }}
+      >
+        {data.label}
+      </div>
     </div>
   );
 };
 
-// Кастомный компонент для шага процесса
+// Кастомный компонент для блока процесса с формами блок-схем
 const ProcessStepNode: React.FC<{ data: any }> = ({ data }) => {
-  return (
-    <div
-      style={{
-        width: "100%",
-        height: "100%",
-        backgroundColor: "#ffffff",
-        border: "2px solid #666",
-        borderRadius: "6px",
-        padding: "10px",
+  const step = data.step;
+  const shapeType = step.shapeType || "rectangle"; // rectangle, diamond, oval, parallelogram
+  
+  // Определяем стили в зависимости от типа фигуры
+  const getShapeStyle = () => {
+    const baseStyle = {
+      padding: "12px",
+      fontSize: "11px",
+      color: "#000",
+      border: "2px solid #333",
+      backgroundColor: "#fff",
+      minHeight: "80px",
+      display: "flex",
+      flexDirection: "column" as const,
+      justifyContent: "center",
+      alignItems: "center",
+      textAlign: "center" as const,
+      wordWrap: "break-word" as const,
+      overflow: "hidden",
+    };
+
+    switch (shapeType) {
+      case "diamond": // Решение
+        return {
+          ...baseStyle,
+          width: "140px",
+          height: "140px",
+          transform: "rotate(45deg)",
+          borderRadius: "8px",
+        };
+      case "oval": // Начало/Конец/Время
+        return {
+          ...baseStyle,
+          width: "180px",
+          height: "90px",
+          borderRadius: "50%",
+        };
+      case "parallelogram": // Ввод/Вывод данных
+        return {
+          ...baseStyle,
+          width: "200px",
+          height: "80px",
+          transform: "skewX(-20deg)",
+        };
+      default: // rectangle - Процесс/Действие
+        return {
+          ...baseStyle,
+          width: "200px",
+          minHeight: "80px",
+          borderRadius: "4px",
+        };
+    }
+  };
+
+  const getContentStyle = () => {
+    if (shapeType === "diamond") {
+      return {
+        transform: "rotate(-45deg)",
+        width: "100px",
         fontSize: "10px",
-        color: "#000",
-        overflow: "auto",
-        boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-      }}
-    >
-      <div style={{ fontWeight: "bold", marginBottom: "4px", fontSize: "11px" }}>
-        {data.order}. {data.label}
+      };
+    }
+    if (shapeType === "parallelogram") {
+      return {
+        transform: "skewX(20deg)",
+      };
+    }
+    return {};
+  };
+
+  return (
+    <div style={getShapeStyle()}>
+      <div style={getContentStyle()}>
+        <div style={{ fontWeight: "bold", marginBottom: "4px" }}>
+          {step.order}. {step.title}
+        </div>
+        {step.duration && (
+          <div style={{ fontSize: "9px", color: "#666", marginTop: "4px" }}>
+            ⏱ {step.duration}
+          </div>
+        )}
       </div>
-      {data.responsible && (
-        <div style={{ fontSize: "9px", color: "#666", marginBottom: "3px" }}>
-          👤 {data.responsible}
-        </div>
-      )}
-      {data.duration && (
-        <div style={{ fontSize: "9px", color: "#666", marginBottom: "4px" }}>
-          ⏱ {data.duration}
-        </div>
-      )}
-      {data.informationSystems && data.informationSystems.length > 0 && (
-        <div style={{ fontSize: "8px", color: "#444", marginBottom: "4px" }}>
-          <div style={{ fontWeight: "600", marginBottom: "2px" }}>ИС:</div>
-          {data.informationSystems.map((is: any, i: number) => (
-            <div key={i}>💻 {is.name}</div>
-          ))}
-        </div>
-      )}
-      {data.substeps && data.substeps.length > 0 && (
-        <div style={{ fontSize: "8px", color: "#444", marginBottom: "4px", lineHeight: "1.2" }}>
-          <div style={{ fontWeight: "600", marginBottom: "2px" }}>Подэтапы:</div>
-          {data.substeps.slice(0, 3).map((substep: string, i: number) => (
-            <div key={i}>{i + 1}. {substep.length > 40 ? substep.substring(0, 40) + "..." : substep}</div>
-          ))}
-        </div>
-      )}
     </div>
   );
 };
@@ -120,7 +162,7 @@ const nodeTypes = {
   processStep: ProcessStepNode,
 };
 
-function ProcessDiagramInner({ steps, roles, stages, branches }: ProcessDiagramProps) {
+function ProcessDiagramInner({ steps = [], roles = [], stages = [], branches = [] }: ProcessDiagramProps) {
   const { fitView } = useReactFlow();
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [selectedRoles, setSelectedRoles] = useState<Set<string>>(
@@ -131,7 +173,7 @@ function ProcessDiagramInner({ steps, roles, stages, branches }: ProcessDiagramP
   // Создаем map ролей для быстрого доступа
   const roleMap = useMemo(() => {
     const map = new Map();
-    roles.forEach((role, index) => {
+    (roles || []).forEach((role, index) => {
       map.set(role.id, {
         ...role,
         index,
@@ -155,7 +197,7 @@ function ProcessDiagramInner({ steps, roles, stages, branches }: ProcessDiagramP
     const maxSteps = Math.max(...Array.from(maxStepsInRole.values()), 5);
     const columnHeight = HEADER_HEIGHT + maxSteps * (STEP_HEIGHT + STEP_SPACING) + 100;
 
-    roles.forEach((role) => {
+    (roles || []).forEach((role) => {
       const roleInfo = roleMap.get(role.id);
       if (!roleInfo) return;
 
@@ -171,7 +213,7 @@ function ProcessDiagramInner({ steps, roles, stages, branches }: ProcessDiagramP
           y: 0,
         },
         style: {
-          width: COLUMN_WIDTH,
+          width: COLUMN_WIDTH - 10,
           height: columnHeight,
           zIndex: -1,
         },
@@ -183,81 +225,49 @@ function ProcessDiagramInner({ steps, roles, stages, branches }: ProcessDiagramP
     return nodes;
   }, [roles, roleMap, steps]);
 
-  // Создаем ноды для шагов
+  // Создаем ноды для шагов процесса
   const stepNodes: Node[] = useMemo(() => {
     const nodes: Node[] = [];
-    const roleStepCounters = new Map<string, number>();
+    const roleStepCounts = new Map<string, number>();
 
-    // Сортируем шаги по этапам и порядку
-    const sortedSteps = [...steps].sort((a, b) => {
-      const stageA = stages.find((s) => s.id === a.stageId);
-      const stageB = stages.find((s) => s.id === b.stageId);
-      if (stageA && stageB && stageA.order !== stageB.order) {
-        return stageA.order - stageB.order;
-      }
-      return a.order - b.order;
-    });
+    // Сортируем шаги по order
+    const sortedSteps = [...(steps || [])].sort((a, b) => a.order - b.order);
 
-    sortedSteps.forEach((step, globalIndex) => {
+    (sortedSteps || []).forEach((step) => {
       const roleInfo = roleMap.get(step.roleId);
       if (!roleInfo) return;
 
-      const stepIndexInRole = roleStepCounters.get(step.roleId) || 0;
-      roleStepCounters.set(step.roleId, stepIndexInRole + 1);
+      const stepIndexInRole = roleStepCounts.get(step.roleId) || 0;
+      roleStepCounts.set(step.roleId, stepIndexInRole + 1);
 
-      const x = roleInfo.index * COLUMN_WIDTH + 10;
-      const y = HEADER_HEIGHT + stepIndexInRole * (STEP_HEIGHT + STEP_SPACING) + 20;
+      const x = roleInfo.index * COLUMN_WIDTH + (COLUMN_WIDTH - 200) / 2;
+      const y = HEADER_HEIGHT + 40 + stepIndexInRole * (STEP_HEIGHT + STEP_SPACING);
 
       nodes.push({
         id: step.id,
         type: "processStep",
-        data: {
-          label: step.name,
-          order: globalIndex + 1,
-          role: roleInfo.name,
-          responsible: step.responsible,
-          duration: step.duration || step.timeEstimate,
-          description: step.description,
-          substeps: step.substeps || [],
-          informationSystems: step.informationSystems || [],
-          mop: step.mop || {
-            materials: step.materials || [],
-            equipment: step.equipment || [],
-            personnel: step.personnel || [],
-          },
-        },
-        position: { x: roleInfo.index * COLUMN_WIDTH + 10, y: HEADER_HEIGHT + stepIndexInRole * (STEP_HEIGHT + STEP_SPACING) + 20 },
-        style: {
-          width: COLUMN_WIDTH - 20,
-          height: STEP_HEIGHT,
-        },
+        data: { step },
+        position: { x, y },
         draggable: true,
       });
     });
 
     return nodes;
-  }, [steps, stages, roleMap]);
+  }, [steps, roleMap]);
 
-  const initialNodes = useMemo(
-    () => [...swimlaneNodes, ...stepNodes],
-    [swimlaneNodes, stepNodes]
-  );
+  const initialNodes = useMemo(() => {
+    return [...swimlaneNodes, ...stepNodes];
+  }, [swimlaneNodes, stepNodes]);
 
-  // Создаем edges (связи)
+  // Создаем edges (связи) между шагами
   const initialEdges: Edge[] = useMemo(() => {
     const edges: Edge[] = [];
     const edgeSet = new Set<string>();
 
-    // Последовательные связи
-    const sortedSteps = [...steps].sort((a, b) => {
-      const stageA = stages.find((s) => s.id === a.stageId);
-      const stageB = stages.find((s) => s.id === b.stageId);
-      if (stageA && stageB && stageA.order !== stageB.order) {
-        return stageA.order - stageB.order;
-      }
-      return a.order - b.order;
-    });
+    // Сортируем шаги по order
+    const sortedSteps = [...(steps || [])].sort((a, b) => a.order - b.order);
 
+    // Создаем последовательные связи
     for (let i = 0; i < sortedSteps.length - 1; i++) {
       const edgeId = `e-${sortedSteps[i].id}-${sortedSteps[i + 1].id}`;
       if (!edgeSet.has(edgeId)) {
@@ -267,11 +277,11 @@ function ProcessDiagramInner({ steps, roles, stages, branches }: ProcessDiagramP
           target: sortedSteps[i + 1].id,
           type: "smoothstep",
           animated: false,
-          style: { stroke: "#333", strokeWidth: 3 },
+          style: { stroke: "#333", strokeWidth: 2 },
           markerEnd: {
             type: MarkerType.ArrowClosed,
-            width: 25,
-            height: 25,
+            width: 20,
+            height: 20,
             color: "#333",
           },
         });
@@ -279,31 +289,33 @@ function ProcessDiagramInner({ steps, roles, stages, branches }: ProcessDiagramP
       }
     }
 
-    // Ветвления
-    branches.forEach((branch, index) => {
-      const edgeId = `e-branch-${branch.fromStepId}-${branch.toStepId}-${index}`;
-      if (!edgeSet.has(edgeId)) {
-        edges.push({
-          id: edgeId,
-          source: branch.fromStepId,
-          target: branch.toStepId,
-          label: branch.condition,
-          type: "smoothstep",
-          animated: true,
-          style: { stroke: "#ff6b6b", strokeWidth: 2 },
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            width: 20,
-            height: 20,
-            color: "#ff6b6b",
-          },
-        });
-        edgeSet.add(edgeId);
-      }
+    // Добавляем ветвления из branches
+    (branches || []).forEach((branch) => {
+      branch.options.forEach((option: any, index: number) => {
+        const edgeId = `e-branch-${branch.fromStepId}-${option.toStepId}-${index}`;
+        if (!edgeSet.has(edgeId)) {
+          edges.push({
+            id: edgeId,
+            source: branch.fromStepId,
+            target: option.toStepId,
+            type: "smoothstep",
+            animated: true,
+            label: option.condition,
+            style: { stroke: "#ff6b6b", strokeWidth: 2 },
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              width: 20,
+              height: 20,
+              color: "#ff6b6b",
+            },
+          });
+          edgeSet.add(edgeId);
+        }
+      });
     });
 
     return edges;
-  }, [steps, stages, branches]);
+  }, [steps, branches]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -381,7 +393,7 @@ function ProcessDiagramInner({ steps, roles, stages, branches }: ProcessDiagramP
       link.href = dataUrl;
       link.click();
     } catch (error) {
-      console.error("Failed to export diagram:", error);
+      console.error("Error exporting to PNG:", error);
     }
   };
 
@@ -402,247 +414,177 @@ function ProcessDiagramInner({ steps, roles, stages, branches }: ProcessDiagramP
       link.href = dataUrl;
       link.click();
     } catch (error) {
-      console.error("Failed to export diagram:", error);
+      console.error("Error exporting to SVG:", error);
     }
   };
 
+  // Находим выбранный шаг для отображения деталей
   const selectedStep = useMemo(() => {
+    if (!selectedNode) return null;
     return steps.find((s) => s.id === selectedNode);
   }, [selectedNode, steps]);
 
   return (
-    <div className="flex gap-4">
-      <div className="flex-1 h-[800px] border rounded-lg bg-background">
-        <ReactFlow
-          nodes={filteredNodes}
-          edges={filteredEdges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onNodeClick={onNodeClick}
-          nodeTypes={nodeTypes}
-          fitView
-          attributionPosition="bottom-left"
+    <div style={{ width: "100%", height: "800px", position: "relative" }}>
+      <ReactFlow
+        nodes={filteredNodes}
+        edges={filteredEdges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        onNodeClick={onNodeClick}
+        nodeTypes={nodeTypes}
+        fitView
+        attributionPosition="bottom-left"
+      >
+        <Background />
+        <Controls />
+
+        <Panel
+          position="top-right"
+          className="bg-background border rounded-lg p-3 shadow-lg space-y-2"
         >
-          <Background />
-          <Controls />
-
-          <Panel
-            position="top-right"
-            className="bg-background border rounded-lg p-3 shadow-lg space-y-2"
+          <div className="text-sm font-semibold mb-2">Экспорт</div>
+          <button
+            onClick={exportToPNG}
+            className="w-full px-3 py-1.5 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90 transition"
           >
-            <div className="text-sm font-semibold mb-2">Экспорт</div>
-            <button
-              onClick={exportToPNG}
-              className="w-full px-3 py-1.5 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90 transition"
-            >
-              ↓ PNG
-            </button>
-            <button
-              onClick={exportToSVG}
-              className="w-full px-3 py-1.5 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90 transition"
-            >
-              ↓ SVG
-            </button>
-          </Panel>
-
-          <Panel
-            position="top-left"
-            className="bg-background border rounded-lg shadow-lg max-w-xs"
+            ↓ PNG
+          </button>
+          <button
+            onClick={exportToSVG}
+            className="w-full px-3 py-1.5 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90 transition"
           >
-            <div 
-              className="flex items-center justify-between p-3 cursor-pointer hover:bg-accent/30 transition"
-              onClick={() => setFilterCollapsed(!filterCollapsed)}
-            >
-              <div className="text-sm font-semibold">Фильтр по ролям</div>
-              {filterCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-            </div>
-            {!filterCollapsed && (
-              <div className="p-3 pt-0">
-                <div className="space-y-1.5 mb-3">
-                  {roles.map((role) => (
-                    <label
-                      key={role.id}
-                      className="flex items-center gap-2 cursor-pointer hover:bg-accent/50 p-1.5 rounded transition"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedRoles.has(role.id)}
-                        onChange={() => toggleRole(role.id)}
-                        className="rounded border-gray-300"
-                      />
-                      <span className="text-xs">{role.name}</span>
-                    </label>
-                  ))}
-                </div>
-                <button
-                  onClick={() => fitView({ duration: 300 })}
-                  className="w-full px-3 py-1.5 text-xs bg-secondary text-secondary-foreground rounded hover:bg-secondary/80 transition"
-                >
-                  🔍 Вместить всё
-                </button>
-                {selectedNode && (
-                  <button
-                    onClick={onDeleteNode}
-                    className="w-full mt-2 px-3 py-1.5 text-xs bg-destructive text-destructive-foreground rounded hover:bg-destructive/90 transition"
-                  >
-                    🗑 Удалить блок
-                  </button>
-                )}
-              </div>
-            )}
-          </Panel>
+            ↓ SVG
+          </button>
+        </Panel>
 
-          <Panel
-            position="bottom-right"
-            className="bg-background border rounded-lg p-3 shadow-lg"
+        <Panel
+          position="top-left"
+          className="bg-background border rounded-lg shadow-lg max-w-xs"
+        >
+          <div 
+            className="flex items-center justify-between p-3 cursor-pointer hover:bg-accent/30 transition"
+            onClick={() => setFilterCollapsed(!filterCollapsed)}
           >
-            <div className="text-sm font-semibold mb-3">Легенда</div>
-            <div className="space-y-2 text-xs">
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 border-2 border-gray-600 bg-white rounded"></div>
-                <span>Шаг процесса</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 border-2 border-red-500 bg-white rounded"></div>
-                <span className="text-red-600">Ветвление</span>
-              </div>
-            </div>
-          </Panel>
-        </ReactFlow>
-      </div>
-
-      {selectedStep && (
-        <div className="w-96 border rounded-lg p-4 bg-background overflow-y-auto max-h-[800px]">
-          <h3 className="font-bold text-lg mb-4">Детали шага</h3>
-          <div className="space-y-4">
-            <div>
-              <div className="text-sm font-semibold text-muted-foreground">Название</div>
-              <div className="text-sm">{selectedStep.name}</div>
-            </div>
-            {selectedStep.description && (
-              <div>
-                <div className="text-sm font-semibold text-muted-foreground">Описание</div>
-                <div className="text-sm">{selectedStep.description}</div>
-              </div>
-            )}
-            {selectedStep.responsible && (
-              <div>
-                <div className="text-sm font-semibold text-muted-foreground">Ответственный</div>
-                <div className="text-sm">{selectedStep.responsible}</div>
-              </div>
-            )}
-            {(selectedStep.duration || selectedStep.timeEstimate) && (
-              <div>
-                <div className="text-sm font-semibold text-muted-foreground">Время выполнения</div>
-                <div className="text-sm">{selectedStep.duration || selectedStep.timeEstimate}</div>
-              </div>
-            )}
-            {selectedStep.substeps && selectedStep.substeps.length > 0 && (
-              <div>
-                <div className="text-sm font-semibold text-muted-foreground">Подэтапы</div>
-                <ol className="text-sm list-decimal list-inside space-y-1">
-                  {selectedStep.substeps.map((substep: string, i: number) => (
-                    <li key={i}>{substep}</li>
-                  ))}
-                </ol>
-              </div>
-            )}
-            {selectedStep.informationSystems && selectedStep.informationSystems.length > 0 && (
-              <div>
-                <div className="text-sm font-semibold text-muted-foreground">Информационные системы</div>
-                <div className="space-y-2">
-                  {selectedStep.informationSystems.map((is: any, i: number) => (
-                    <div key={i} className="text-sm border-l-2 border-primary pl-2">
-                      <div className="font-semibold">{is.name}</div>
-                      {is.purpose && <div className="text-xs text-muted-foreground">{is.purpose}</div>}
-                      {is.actions && is.actions.length > 0 && (
-                        <ul className="text-xs list-disc list-inside mt-1">
-                          {is.actions.map((action: string, j: number) => (
-                            <li key={j}>{action}</li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            {selectedStep.input && (
-              <div>
-                <div className="text-sm font-semibold text-muted-foreground">Вход</div>
-                <div className="text-sm">{selectedStep.input}</div>
-              </div>
-            )}
-            {selectedStep.output && (
-              <div>
-                <div className="text-sm font-semibold text-muted-foreground">Выход</div>
-                <div className="text-sm">{selectedStep.output}</div>
-              </div>
-            )}
-            {selectedStep.regulations && selectedStep.regulations.length > 0 && (
-              <div>
-                <div className="text-sm font-semibold text-muted-foreground">Регламенты</div>
-                <ul className="text-sm list-disc list-inside">
-                  {selectedStep.regulations.map((r: string, i: number) => (
-                    <li key={i}>{r}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {selectedStep.documents && selectedStep.documents.length > 0 && (
-              <div>
-                <div className="text-sm font-semibold text-muted-foreground">Документы</div>
-                <ul className="text-sm list-disc list-inside">
-                  {selectedStep.documents.map((d: string, i: number) => (
-                    <li key={i}>{d}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {selectedStep.mop && (
-              <div>
-                <div className="text-sm font-semibold text-muted-foreground mb-2">МОП</div>
-                {selectedStep.mop.materials && selectedStep.mop.materials.length > 0 && (
-                  <div className="mb-2">
-                    <div className="text-xs font-semibold text-muted-foreground">Материалы</div>
-                    <ul className="text-sm list-disc list-inside">
-                      {selectedStep.mop.materials.map((m: string, i: number) => (
-                        <li key={i}>{m}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {selectedStep.mop.equipment && selectedStep.mop.equipment.length > 0 && (
-                  <div className="mb-2">
-                    <div className="text-xs font-semibold text-muted-foreground">Оборудование</div>
-                    <ul className="text-sm list-disc list-inside">
-                      {selectedStep.mop.equipment.map((e: string, i: number) => (
-                        <li key={i}>{e}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {selectedStep.mop.personnel && selectedStep.mop.personnel.length > 0 && (
-                  <div>
-                    <div className="text-xs font-semibold text-muted-foreground">Персонал</div>
-                    <ul className="text-sm list-disc list-inside">
-                      {selectedStep.mop.personnel.map((p: string, i: number) => (
-                        <li key={i}>{p}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            )}
+            <div className="text-sm font-semibold">Фильтр по ролям</div>
+            {filterCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
           </div>
-        </div>
-      )}
+          {!filterCollapsed && (
+            <div className="p-3 pt-0">
+              <div className="space-y-1.5 mb-3">
+                {(roles || []).map((role) => (
+                  <label
+                    key={role.id}
+                    className="flex items-center gap-2 cursor-pointer hover:bg-accent/50 p-1.5 rounded transition"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedRoles.has(role.id)}
+                      onChange={() => toggleRole(role.id)}
+                      className="rounded border-gray-300"
+                    />
+                    <span className="text-xs">{role.name}</span>
+                  </label>
+                ))}
+              </div>
+              <button
+                onClick={() => fitView({ duration: 300 })}
+                className="w-full px-3 py-1.5 text-xs bg-secondary text-secondary-foreground rounded hover:bg-secondary/80 transition"
+              >
+                🔍 Вместить всё
+              </button>
+              {selectedNode && (
+                <button
+                  onClick={onDeleteNode}
+                  className="w-full mt-2 px-3 py-1.5 text-xs bg-destructive text-destructive-foreground rounded hover:bg-destructive/90 transition"
+                >
+                  🗑 Удалить блок
+                </button>
+              )}
+            </div>
+          )}
+        </Panel>
+
+        <Panel
+          position="bottom-right"
+          className="bg-background border rounded-lg p-3 shadow-lg"
+        >
+          <div className="text-xs font-semibold mb-2">Легенда</div>
+          <div className="space-y-1 text-xs">
+            <div className="flex items-center gap-2">
+              <div style={{ width: "30px", height: "20px", border: "2px solid #333", borderRadius: "2px", backgroundColor: "#fff" }}></div>
+              <span>Процесс</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div style={{ width: "20px", height: "20px", border: "2px solid #333", transform: "rotate(45deg)", backgroundColor: "#fff" }}></div>
+              <span>Решение</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div style={{ width: "30px", height: "18px", border: "2px solid #333", borderRadius: "50%", backgroundColor: "#fff" }}></div>
+              <span>Начало/Конец</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div style={{ width: "30px", height: "18px", border: "2px solid #333", transform: "skewX(-20deg)", backgroundColor: "#fff" }}></div>
+              <span>Данные</span>
+            </div>
+          </div>
+        </Panel>
+
+        {selectedStep && (
+          <Panel
+            position="bottom-left"
+            className="bg-background border rounded-lg p-4 shadow-lg max-w-md"
+          >
+            <div className="text-sm font-semibold mb-3">Детали шага</div>
+            <div className="space-y-2 text-xs">
+              <div>
+                <span className="font-semibold">Название:</span> {selectedStep.title}
+              </div>
+              {selectedStep.description && (
+                <div>
+                  <span className="font-semibold">Описание:</span> {selectedStep.description}
+                </div>
+              )}
+              {selectedStep.duration && (
+                <div>
+                  <span className="font-semibold">Длительность:</span> {selectedStep.duration}
+                </div>
+              )}
+              {selectedStep.responsible && (
+                <div>
+                  <span className="font-semibold">Ответственный:</span> {selectedStep.responsible}
+                </div>
+              )}
+              {selectedStep.substeps && selectedStep.substeps.length > 0 && (
+                <div>
+                  <span className="font-semibold">Подэтапы:</span>
+                  <ol className="list-decimal list-inside ml-2 mt-1">
+                    {selectedStep.substeps.map((substep: any, index: number) => (
+                      <li key={index}>{substep.action}</li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+              {selectedStep.informationSystems && selectedStep.informationSystems.length > 0 && (
+                <div>
+                  <span className="font-semibold">Информационные системы:</span>
+                  <ul className="list-disc list-inside ml-2 mt-1">
+                    {selectedStep.informationSystems.map((is: any, index: number) => (
+                      <li key={index}>{is.name}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </Panel>
+        )}
+      </ReactFlow>
     </div>
   );
 }
 
-export function ProcessDiagram(props: ProcessDiagramProps) {
+export default function ProcessDiagram(props: ProcessDiagramProps) {
   return (
     <ReactFlowProvider>
       <ProcessDiagramInner {...props} />
