@@ -291,7 +291,7 @@ function ProcessDiagramInner({ steps = [], roles = [], stages = [], branches = [
 
     // Добавляем ветвления из branches
     (branches || []).forEach((branch) => {
-      branch.options.forEach((option: any, index: number) => {
+      (branch.options || []).forEach((option: any, index: number) => {
         const edgeId = `e-branch-${branch.fromStepId}-${option.toStepId}-${index}`;
         if (!edgeSet.has(edgeId)) {
           edges.push({
