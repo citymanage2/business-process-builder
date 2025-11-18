@@ -1,6 +1,13 @@
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { 
+  InsertUser, users,
+  InsertCompany, companies,
+  InsertInterview, interviews,
+  InsertBusinessProcess, businessProcesses,
+  InsertRecommendation, recommendations,
+  InsertComment, comments
+} from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -89,4 +96,117 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+// Companies
+export async function createCompany(company: InsertCompany) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(companies).values(company);
+  return result[0].insertId;
+}
+
+export async function getUserCompanies(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(companies).where(eq(companies.userId, userId));
+}
+
+export async function getCompanyById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(companies).where(eq(companies.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function updateCompany(id: number, data: Partial<InsertCompany>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(companies).set(data).where(eq(companies.id, id));
+}
+
+export async function deleteCompany(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(companies).where(eq(companies.id, id));
+}
+
+// Interviews
+export async function createInterview(interview: InsertInterview) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(interviews).values(interview);
+  return result[0].insertId;
+}
+
+export async function getInterviewById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(interviews).where(eq(interviews.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function updateInterview(id: number, data: Partial<InsertInterview>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(interviews).set(data).where(eq(interviews.id, id));
+}
+
+// Business Processes
+export async function createBusinessProcess(process: InsertBusinessProcess) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(businessProcesses).values(process);
+  return result[0].insertId;
+}
+
+export async function getCompanyProcesses(companyId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(businessProcesses).where(eq(businessProcesses.companyId, companyId));
+}
+
+export async function getProcessById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(businessProcesses).where(eq(businessProcesses.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function updateBusinessProcess(id: number, data: Partial<InsertBusinessProcess>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(businessProcesses).set(data).where(eq(businessProcesses.id, id));
+}
+
+// Recommendations
+export async function createRecommendation(recommendation: InsertRecommendation) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(recommendations).values(recommendation);
+  return result[0].insertId;
+}
+
+export async function getProcessRecommendations(businessProcessId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(recommendations).where(eq(recommendations.businessProcessId, businessProcessId));
+}
+
+// Comments
+export async function createComment(comment: InsertComment) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(comments).values(comment);
+  return result[0].insertId;
+}
+
+export async function getProcessComments(businessProcessId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(comments).where(eq(comments.businessProcessId, businessProcessId));
+}
+
+export async function deleteComment(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(comments).where(eq(comments.id, id));
+}
