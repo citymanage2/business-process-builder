@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import ReactFlow, {
   Node,
   Edge,
@@ -8,6 +8,8 @@ import ReactFlow, {
   useNodesState,
   useEdgesState,
   MarkerType,
+  useReactFlow,
+  Panel,
 } from "reactflow";
 import "reactflow/dist/style.css";
 
@@ -60,6 +62,9 @@ const ROLE_COLORS: Record<string, string> = {
 };
 
 export function ProcessDiagram({ steps, roles, stages, branches = [] }: ProcessDiagramProps) {
+  const [selectedRoles, setSelectedRoles] = useState<Set<string>>(new Set(roles.map(r => r.id)));
+  const { fitView } = useReactFlow();
+  
   const roleMap = useMemo(() => {
     const map: Record<string, ProcessRole> = {};
     roles.forEach((role) => {
@@ -201,11 +206,80 @@ export function ProcessDiagram({ steps, roles, stages, branches = [] }: ProcessD
   const [nodes, , onNodesChange] = useNodesState(initialNodes);
   const [edges, , onEdgesChange] = useEdgesState(initialEdges);
 
+  // Filter nodes and edges based on selected roles
+  const filteredNodes = useMemo(() => {
+    return nodes.filter(node => {
+      const step = steps.find(s => s.id === node.id);
+      return !step || selectedRoles.has(step.roleId);
+    });
+  }, [nodes, steps, selectedRoles]);
+
+  const filteredEdges = useMemo(() => {
+    const visibleNodeIds = new Set(filteredNodes.map(n => n.id));
+    return edges.filter(edge => 
+      visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target)
+    );
+  }, [edges, filteredNodes]);
+
+  const toggleRole = (roleId: string) => {
+    setSelectedRoles(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(roleId)) {
+        newSet.delete(roleId);
+      } else {
+        newSet.add(roleId);
+      }
+      return newSet;
+    });
+  };
+
+  const exportToPNG = async () => {
+    const { toPng } = await import('html-to-image');
+    const element = document.querySelector('.react-flow') as HTMLElement;
+    if (!element) return;
+    
+    try {
+      const dataUrl = await toPng(element, {
+        backgroundColor: '#ffffff',
+        width: element.offsetWidth,
+        height: element.offsetHeight,
+      });
+      
+      const link = document.createElement('a');
+      link.download = 'business-process-diagram.png';
+      link.href = dataUrl;
+      link.click();
+    } catch (error) {
+      console.error('Failed to export diagram:', error);
+    }
+  };
+
+  const exportToSVG = async () => {
+    const { toSvg } = await import('html-to-image');
+    const element = document.querySelector('.react-flow') as HTMLElement;
+    if (!element) return;
+    
+    try {
+      const dataUrl = await toSvg(element, {
+        backgroundColor: '#ffffff',
+        width: element.offsetWidth,
+        height: element.offsetHeight,
+      });
+      
+      const link = document.createElement('a');
+      link.download = 'business-process-diagram.svg';
+      link.href = dataUrl;
+      link.click();
+    } catch (error) {
+      console.error('Failed to export diagram:', error);
+    }
+  };
+
   return (
     <div className="w-full h-[600px] border rounded-lg bg-background">
       <ReactFlow
-        nodes={nodes}
-        edges={edges}
+        nodes={filteredNodes}
+        edges={filteredEdges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         fitView
@@ -219,6 +293,45 @@ export function ProcessDiagram({ steps, roles, stages, branches = [] }: ProcessD
           }}
           maskColor="rgba(0, 0, 0, 0.1)"
         />
+        
+        <Panel position="top-right" className="bg-background border rounded-lg p-3 shadow-lg space-y-2">
+          <div className="text-sm font-semibold mb-2">Экспорт</div>
+          <button
+            onClick={exportToPNG}
+            className="w-full px-3 py-1.5 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90 transition"
+          >
+            ↓ PNG
+          </button>
+          <button
+            onClick={exportToSVG}
+            className="w-full px-3 py-1.5 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90 transition"
+          >
+            ↓ SVG
+          </button>
+        </Panel>
+
+        <Panel position="top-left" className="bg-background border rounded-lg p-3 shadow-lg max-w-xs">
+          <div className="text-sm font-semibold mb-2">Фильтр по ролям</div>
+          <div className="space-y-1.5">
+            {roles.map(role => (
+              <label key={role.id} className="flex items-center gap-2 cursor-pointer hover:bg-accent/50 p-1.5 rounded transition">
+                <input
+                  type="checkbox"
+                  checked={selectedRoles.has(role.id)}
+                  onChange={() => toggleRole(role.id)}
+                  className="rounded border-gray-300"
+                />
+                <span className="text-xs">{role.name}</span>
+              </label>
+            ))}
+          </div>
+          <button
+            onClick={() => fitView({ duration: 300 })}
+            className="w-full mt-3 px-3 py-1.5 text-xs bg-secondary text-secondary-foreground rounded hover:bg-secondary/80 transition"
+          >
+            🔍 Вместить всё
+          </button>
+        </Panel>
       </ReactFlow>
 
       <div className="mt-4 p-4 border-t">

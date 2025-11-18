@@ -333,23 +333,41 @@ export const appRouter = router({
         const content = typeof response.choices[0].message.content === 'string' 
           ? response.choices[0].message.content 
           : JSON.stringify(response.choices[0].message.content);
-        const recommendations = JSON.parse(content);
+        
+        let recommendations;
+        try {
+          recommendations = JSON.parse(content);
+        } catch (error) {
+          console.error("[Recommendations] JSON parse error:", error);
+          console.error("[Recommendations] Content:", content.substring(0, 500));
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to parse recommendations. Please try again.',
+          });
+        }
 
         // Save recommendations to DB
+        const savedRecs = [];
         if (Array.isArray(recommendations.recommendations)) {
           for (const rec of recommendations.recommendations) {
-            await createRecommendation({
-              businessProcessId: input.processId,
-              category: rec.category,
-              priority: rec.priority,
-              title: rec.title,
-              description: rec.description,
-              toolsSuggested: JSON.stringify(rec.tools || []),
-            });
+            try {
+              const id = await createRecommendation({
+                businessProcessId: input.processId,
+                category: rec.category || 'optimization',
+                priority: rec.priority || 'medium',
+                title: rec.title || 'Рекомендация',
+                description: rec.description || '',
+                toolsSuggested: JSON.stringify(rec.tools || []),
+              });
+              savedRecs.push({ id, ...rec });
+            } catch (error) {
+              console.error("[Recommendations] Failed to save recommendation:", error);
+            }
           }
         }
 
-        return { recommendations: recommendations.recommendations || [] };
+        console.log(`[Recommendations] Saved ${savedRecs.length} recommendations for process ${input.processId}`);
+        return { recommendations: savedRecs };
       }),
     list: protectedProcedure
       .input(z.object({ processId: z.number() }))
