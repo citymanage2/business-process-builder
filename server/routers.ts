@@ -2,6 +2,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
   createCompany,
@@ -220,7 +221,28 @@ export const appRouter = router({
         const content = typeof response.choices[0].message.content === 'string' 
           ? response.choices[0].message.content 
           : JSON.stringify(response.choices[0].message.content);
-        const processData = JSON.parse(content);
+        
+        let processData;
+        try {
+          processData = JSON.parse(content);
+        } catch (error) {
+          console.error("[Process Generation] JSON parse error:", error);
+          console.error("[Process Generation] Content length:", content.length);
+          console.error("[Process Generation] Content preview:", content.substring(0, 500));
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to parse LLM response. Please try again.',
+          });
+        }
+
+        // Validate required fields
+        if (!processData.title || !processData.stages || !processData.roles || !processData.steps) {
+          console.error("[Process Generation] Missing required fields in processData:", Object.keys(processData));
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Invalid process data structure. Please try again.',
+          });
+        }
 
         const id = await createBusinessProcess({
           companyId: input.companyId,
