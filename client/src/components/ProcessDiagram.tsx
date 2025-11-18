@@ -1,240 +1,232 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useMemo, useState, useCallback } from "react";
 import ReactFlow, {
   Node,
   Edge,
-  Background,
   Controls,
+  Background,
+  Panel,
   useNodesState,
   useEdgesState,
   MarkerType,
-  useReactFlow,
-  Panel,
   ReactFlowProvider,
-  NodeTypes,
-  Connection,
-  addEdge,
+  useReactFlow,
 } from "reactflow";
 import "reactflow/dist/style.css";
 
-interface ProcessStep {
-  id: string;
-  stageId: string;
-  roleId: string;
-  name: string;
-  order: number;
-  input?: string;
-  actions?: string[];
-  output?: string;
-  tools?: string[];
-  sla?: string;
-  type?: "action" | "decision" | "result" | "time";
-  mop?: {
-    materials?: string[];
-    equipment?: string[];
-    personnel?: string[];
-  };
-}
-
-interface ProcessRole {
-  id: string;
-  name: string;
-  color: string;
-}
-
-interface ProcessStage {
-  id: string;
-  name: string;
-  order: number;
-}
-
-interface ProcessBranch {
-  fromStepId: string;
-  toStepId: string;
-  condition: string;
-}
-
 interface ProcessDiagramProps {
-  steps: ProcessStep[];
-  roles: ProcessRole[];
-  stages: ProcessStage[];
-  branches?: ProcessBranch[];
+  steps: any[];
+  roles: any[];
+  stages: any[];
+  branches: any[];
 }
 
-// Custom node components for different shapes
-const ActionNode = ({ data }: any) => (
-  <div
-    className="px-4 py-3 rounded-lg border-2 shadow-md min-w-[180px] max-w-[220px]"
-    style={{
-      backgroundColor: data.color,
-      borderColor: data.borderColor || "#666",
-    }}
-  >
-    <div className="font-semibold text-sm mb-1 text-gray-900 break-words">
+// Пастельные цвета для колонок ролей (как в PDF)
+const PASTEL_COLORS = [
+  "#E3F2FD", // светло-голубой
+  "#FFF9C4", // светло-желтый
+  "#F8BBD0", // светло-розовый
+  "#C8E6C9", // светло-зеленый
+  "#E1BEE7", // светло-фиолетовый
+  "#FFCCBC", // светло-оранжевый
+  "#B2DFDB", // светло-бирюзовый
+  "#D7CCC8", // светло-коричневый
+  "#CFD8DC", // светло-серый
+];
+
+const COLUMN_WIDTH = 250;
+const STEP_HEIGHT = 180;
+const STEP_SPACING = 40;
+const HEADER_HEIGHT = 60;
+
+// Кастомный компонент для swimlane колонки
+const SwimlaneColumn: React.FC<{ data: any }> = ({ data }) => {
+  return (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        backgroundColor: data.color,
+        border: "2px solid #999",
+        borderRadius: "8px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontWeight: "bold",
+        fontSize: "14px",
+        color: "#333",
+        padding: "8px",
+        textAlign: "center",
+      }}
+    >
       {data.label}
     </div>
-    {data.sla && (
-      <div className="text-xs text-gray-700 mt-1">⏱ {data.sla}</div>
-    )}
-    {data.tools && data.tools.length > 0 && (
-      <div className="text-xs text-gray-700 mt-1">
-        🛠 {data.tools.join(", ")}
-      </div>
-    )}
-  </div>
-);
-
-const DecisionNode = ({ data }: any) => (
-  <div
-    className="relative px-6 py-4 min-w-[160px] max-w-[200px]"
-    style={{
-      clipPath: "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)",
-      backgroundColor: data.color,
-      border: `2px solid ${data.borderColor || "#666"}`,
-    }}
-  >
-    <div className="font-semibold text-sm text-center text-gray-900 break-words">
-      {data.label}
-    </div>
-  </div>
-);
-
-const ResultNode = ({ data }: any) => (
-  <div
-    className="px-4 py-3 rounded-md border-2 shadow-md min-w-[180px] max-w-[220px]"
-    style={{
-      backgroundColor: data.color,
-      borderColor: data.borderColor || "#666",
-      borderRadius: "8px",
-    }}
-  >
-    <div className="font-semibold text-sm mb-1 text-gray-900 break-words">
-      📄 {data.label}
-    </div>
-    {data.output && (
-      <div className="text-xs text-gray-700 mt-1">
-        Результат: {data.output}
-      </div>
-    )}
-  </div>
-);
-
-const TimeNode = ({ data }: any) => (
-  <div
-    className="px-6 py-3 rounded-full border-2 shadow-md min-w-[140px] max-w-[180px]"
-    style={{
-      backgroundColor: data.color,
-      borderColor: data.borderColor || "#666",
-    }}
-  >
-    <div className="font-semibold text-sm text-center text-gray-900 break-words">
-      ⏰ {data.label}
-    </div>
-    {data.sla && (
-      <div className="text-xs text-center text-gray-700 mt-1">{data.sla}</div>
-    )}
-  </div>
-);
-
-const nodeTypes: NodeTypes = {
-  action: ActionNode,
-  decision: DecisionNode,
-  result: ResultNode,
-  time: TimeNode,
+  );
 };
 
-const SWIMLANE_HEIGHT = 200;
-const SWIMLANE_PADDING = 20;
-const NODE_SPACING_X = 280;
-const NODE_SPACING_Y = 100;
+// Кастомный компонент для шага процесса
+const ProcessStepNode: React.FC<{ data: any }> = ({ data }) => {
+  return (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        backgroundColor: "#ffffff",
+        border: "2px solid #666",
+        borderRadius: "6px",
+        padding: "12px",
+        fontSize: "11px",
+        color: "#000",
+        overflow: "hidden",
+        boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+      }}
+    >
+      <div style={{ fontWeight: "bold", marginBottom: "6px", fontSize: "12px" }}>
+        {data.order}. {data.label}
+      </div>
+      {data.role && (
+        <div style={{ fontSize: "10px", color: "#666", marginBottom: "4px" }}>
+          👤 {data.role}
+        </div>
+      )}
+      {data.duration && (
+        <div style={{ fontSize: "10px", color: "#666", marginBottom: "6px" }}>
+          ⏱ {data.duration}
+        </div>
+      )}
+      {data.mop && (
+        <div style={{ fontSize: "9px", color: "#444", lineHeight: "1.3" }}>
+          <div style={{ fontWeight: "600", marginBottom: "3px" }}>МОП:</div>
+          {data.mop.materials && data.mop.materials.length > 0 && (
+            <div>📦 {data.mop.materials.join(", ")}</div>
+          )}
+          {data.mop.equipment && data.mop.equipment.length > 0 && (
+            <div>🔧 {data.mop.equipment.join(", ")}</div>
+          )}
+          {data.mop.personnel && data.mop.personnel.length > 0 && (
+            <div>👥 {data.mop.personnel.join(", ")}</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
-function ProcessDiagramInner({ steps, roles, stages, branches = [] }: ProcessDiagramProps) {
+const nodeTypes = {
+  swimlane: SwimlaneColumn,
+  processStep: ProcessStepNode,
+};
+
+function ProcessDiagramInner({ steps, roles, stages, branches }: ProcessDiagramProps) {
+  const { fitView } = useReactFlow();
+  const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [selectedRoles, setSelectedRoles] = useState<Set<string>>(
     new Set(roles.map((r) => r.id))
   );
-  const [selectedNode, setSelectedNode] = useState<string | null>(null);
-  const { fitView, deleteElements } = useReactFlow();
 
+  // Создаем map ролей для быстрого доступа
   const roleMap = useMemo(() => {
-    const map: Record<string, { role: ProcessRole; index: number }> = {};
+    const map = new Map();
     roles.forEach((role, index) => {
-      map[role.id] = { role, index };
+      map.set(role.id, {
+        ...role,
+        index,
+        color: PASTEL_COLORS[index % PASTEL_COLORS.length],
+      });
     });
     return map;
   }, [roles]);
 
-  // Create swimlane background nodes
+  // Создаем swimlane колонки (вертикальные)
   const swimlaneNodes: Node[] = useMemo(() => {
-    return roles.map((role, index) => ({
-      id: `swimlane-${role.id}`,
-      type: "group",
-      position: { x: 0, y: index * (SWIMLANE_HEIGHT + SWIMLANE_PADDING) },
-      data: { label: role.name },
-      style: {
-        backgroundColor: `${role.color}20`,
-        width: 2000,
-        height: SWIMLANE_HEIGHT,
-        border: `2px solid ${role.color}`,
-        borderRadius: "8px",
-      },
-      draggable: false,
-      selectable: false,
-    }));
-  }, [roles]);
+    const nodes: Node[] = [];
+    const maxStepsInRole = new Map<string, number>();
 
-  // Create step nodes with swimlane positioning
-  const stepNodes: Node[] = useMemo(() => {
-    const stageGroups: Record<string, ProcessStep[]> = {};
-    
+    // Подсчитываем максимальное количество шагов в каждой роли
     steps.forEach((step) => {
-      if (!stageGroups[step.stageId]) {
-        stageGroups[step.stageId] = [];
-      }
-      stageGroups[step.stageId].push(step);
+      const count = maxStepsInRole.get(step.roleId) || 0;
+      maxStepsInRole.set(step.roleId, count + 1);
     });
 
-    const nodes: Node[] = [];
-    let currentX = 100;
+    const maxSteps = Math.max(...Array.from(maxStepsInRole.values()), 5);
+    const columnHeight = HEADER_HEIGHT + maxSteps * (STEP_HEIGHT + STEP_SPACING) + 100;
 
-    stages
-      .sort((a, b) => a.order - b.order)
-      .forEach((stage) => {
-        const stageSteps = stageGroups[stage.id] || [];
-        stageSteps.sort((a, b) => a.order - b.order);
+    roles.forEach((role) => {
+      const roleInfo = roleMap.get(role.id);
+      if (!roleInfo) return;
 
-        stageSteps.forEach((step) => {
-          const roleInfo = roleMap[step.roleId];
-          if (!roleInfo) return;
-
-          const y =
-            roleInfo.index * (SWIMLANE_HEIGHT + SWIMLANE_PADDING) +
-            SWIMLANE_HEIGHT / 2 -
-            40;
-
-          const nodeType = step.type || "action";
-          
-          nodes.push({
-            id: step.id,
-            type: nodeType,
-            position: { x: currentX, y },
-            data: {
-              label: step.name,
-              color: roleInfo.role.color,
-              borderColor: roleInfo.role.color.replace("ff", "cc"),
-              sla: step.sla,
-              tools: step.tools,
-              output: step.output,
-              input: step.input,
-              actions: step.actions,
-              mop: step.mop,
-            },
-            parentNode: `swimlane-${step.roleId}`,
-            extent: "parent" as const,
-            draggable: true,
-          });
-        });
-
-        currentX += NODE_SPACING_X;
+      nodes.push({
+        id: `swimlane-${role.id}`,
+        type: "swimlane",
+        data: {
+          label: role.name,
+          color: roleInfo.color,
+        },
+        position: {
+          x: roleInfo.index * COLUMN_WIDTH,
+          y: 0,
+        },
+        style: {
+          width: COLUMN_WIDTH,
+          height: columnHeight,
+          zIndex: -1,
+        },
+        draggable: false,
+        selectable: false,
       });
+    });
+
+    return nodes;
+  }, [roles, roleMap, steps]);
+
+  // Создаем ноды для шагов
+  const stepNodes: Node[] = useMemo(() => {
+    const nodes: Node[] = [];
+    const roleStepCounters = new Map<string, number>();
+
+    // Сортируем шаги по этапам и порядку
+    const sortedSteps = [...steps].sort((a, b) => {
+      const stageA = stages.find((s) => s.id === a.stageId);
+      const stageB = stages.find((s) => s.id === b.stageId);
+      if (stageA && stageB && stageA.order !== stageB.order) {
+        return stageA.order - stageB.order;
+      }
+      return a.order - b.order;
+    });
+
+    sortedSteps.forEach((step, globalIndex) => {
+      const roleInfo = roleMap.get(step.roleId);
+      if (!roleInfo) return;
+
+      const stepIndexInRole = roleStepCounters.get(step.roleId) || 0;
+      roleStepCounters.set(step.roleId, stepIndexInRole + 1);
+
+      const x = roleInfo.index * COLUMN_WIDTH + 10;
+      const y = HEADER_HEIGHT + stepIndexInRole * (STEP_HEIGHT + STEP_SPACING) + 20;
+
+      nodes.push({
+        id: step.id,
+        type: "processStep",
+        data: {
+          label: step.name,
+          order: globalIndex + 1,
+          role: roleInfo.name,
+          duration: step.duration || step.timeEstimate,
+          mop: step.mop || {
+            materials: step.materials || [],
+            equipment: step.equipment || [],
+            personnel: step.personnel || [],
+          },
+        },
+        position: { x, y },
+        style: {
+          width: COLUMN_WIDTH - 20,
+          height: STEP_HEIGHT,
+        },
+        parentNode: `swimlane-${step.roleId}`,
+        extent: "parent" as const,
+        draggable: true,
+      });
+    });
 
     return nodes;
   }, [steps, stages, roleMap]);
@@ -244,17 +236,17 @@ function ProcessDiagramInner({ steps, roles, stages, branches = [] }: ProcessDia
     [swimlaneNodes, stepNodes]
   );
 
-  // Create edges
+  // Создаем edges (связи)
   const initialEdges: Edge[] = useMemo(() => {
     const edges: Edge[] = [];
     const edgeSet = new Set<string>();
 
-    // Sequential edges
+    // Последовательные связи
     const sortedSteps = [...steps].sort((a, b) => {
-      if (a.stageId !== b.stageId) {
-        const stageA = stages.find((s) => s.id === a.stageId);
-        const stageB = stages.find((s) => s.id === b.stageId);
-        return (stageA?.order || 0) - (stageB?.order || 0);
+      const stageA = stages.find((s) => s.id === a.stageId);
+      const stageB = stages.find((s) => s.id === b.stageId);
+      if (stageA && stageB && stageA.order !== stageB.order) {
+        return stageA.order - stageB.order;
       }
       return a.order - b.order;
     });
@@ -268,17 +260,19 @@ function ProcessDiagramInner({ steps, roles, stages, branches = [] }: ProcessDia
           target: sortedSteps[i + 1].id,
           type: "smoothstep",
           animated: false,
+          style: { stroke: "#666", strokeWidth: 2 },
           markerEnd: {
             type: MarkerType.ArrowClosed,
             width: 20,
             height: 20,
+            color: "#666",
           },
         });
         edgeSet.add(edgeId);
       }
     }
 
-    // Branch edges
+    // Ветвления
     branches.forEach((branch, index) => {
       const edgeId = `e-branch-${branch.fromStepId}-${branch.toStepId}-${index}`;
       if (!edgeSet.has(edgeId)) {
@@ -307,29 +301,30 @@ function ProcessDiagramInner({ steps, roles, stages, branches = [] }: ProcessDia
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-  // Filter nodes and edges based on selected roles
+  // Фильтрация по ролям
   const filteredNodes = useMemo(() => {
     return nodes.filter((node) => {
-      if (node.id.startsWith("swimlane-")) {
+      if (node.type === "swimlane") {
         const roleId = node.id.replace("swimlane-", "");
         return selectedRoles.has(roleId);
       }
-      const step = steps.find((s) => s.id === node.id);
-      return !step || selectedRoles.has(step.roleId);
+      if (node.type === "processStep") {
+        const step = steps.find((s) => s.id === node.id);
+        return step && selectedRoles.has(step.roleId);
+      }
+      return true;
     });
-  }, [nodes, steps, selectedRoles]);
+  }, [nodes, selectedRoles, steps]);
 
   const filteredEdges = useMemo(() => {
-    const visibleNodeIds = new Set(
-      filteredNodes.filter((n) => !n.id.startsWith("swimlane-")).map((n) => n.id)
-    );
-    return edges.filter(
-      (edge) =>
-        visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target)
-    );
+    return edges.filter((edge) => {
+      const sourceNode = filteredNodes.find((n) => n.id === edge.source);
+      const targetNode = filteredNodes.find((n) => n.id === edge.target);
+      return sourceNode && targetNode;
+    });
   }, [edges, filteredNodes]);
 
-  const toggleRole = (roleId: string) => {
+  const toggleRole = useCallback((roleId: string) => {
     setSelectedRoles((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(roleId)) {
@@ -339,25 +334,28 @@ function ProcessDiagramInner({ steps, roles, stages, branches = [] }: ProcessDia
       }
       return newSet;
     });
-  };
+  }, []);
 
-  const onConnect = useCallback(
-    (params: Connection) => setEdges((eds) => addEdge(params, eds)),
-    [setEdges]
-  );
-
-  const onNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
-    if (!node.id.startsWith("swimlane-")) {
+  const onNodeClick = useCallback((_: any, node: Node) => {
+    if (node.type === "processStep") {
       setSelectedNode(node.id);
     }
   }, []);
 
+  const onConnect = useCallback(
+    (params: any) => setEdges((eds) => [...eds, params]),
+    [setEdges]
+  );
+
   const onDeleteNode = useCallback(() => {
     if (selectedNode) {
-      deleteElements({ nodes: [{ id: selectedNode }] });
+      setNodes((nds) => nds.filter((n) => n.id !== selectedNode));
+      setEdges((eds) =>
+        eds.filter((e) => e.source !== selectedNode && e.target !== selectedNode)
+      );
       setSelectedNode(null);
     }
-  }, [selectedNode, deleteElements]);
+  }, [selectedNode, setNodes, setEdges]);
 
   const exportToPNG = async () => {
     const { toPng } = await import("html-to-image");
@@ -407,7 +405,7 @@ function ProcessDiagramInner({ steps, roles, stages, branches = [] }: ProcessDia
 
   return (
     <div className="flex gap-4">
-      <div className="flex-1 h-[700px] border rounded-lg bg-background">
+      <div className="flex-1 h-[800px] border rounded-lg bg-background">
         <ReactFlow
           nodes={filteredNodes}
           edges={filteredEdges}
@@ -482,34 +480,15 @@ function ProcessDiagramInner({ steps, roles, stages, branches = [] }: ProcessDia
             position="bottom-right"
             className="bg-background border rounded-lg p-3 shadow-lg"
           >
-            <div className="text-sm font-semibold mb-3">Легенда типов блоков</div>
-            <div className="space-y-2">
+            <div className="text-sm font-semibold mb-3">Легенда</div>
+            <div className="space-y-2 text-xs">
               <div className="flex items-center gap-2">
-                <div className="w-16 h-8 bg-blue-100 border-2 border-blue-500 rounded flex items-center justify-center">
-                  <span className="text-[8px] font-semibold text-gray-800">Действие</span>
-                </div>
-                <span className="text-xs text-muted-foreground">Прямоугольник</span>
+                <div className="w-4 h-4 border-2 border-gray-600 bg-white rounded"></div>
+                <span>Шаг процесса</span>
               </div>
               <div className="flex items-center gap-2">
-                <div 
-                  className="w-16 h-8 bg-yellow-100 border-2 border-yellow-600 flex items-center justify-center"
-                  style={{ clipPath: "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)" }}
-                >
-                  <span className="text-[8px] font-semibold text-gray-800">Решение</span>
-                </div>
-                <span className="text-xs text-muted-foreground">Ромб</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-16 h-8 bg-green-100 border-2 border-green-600 rounded flex items-center justify-center">
-                  <span className="text-[8px] font-semibold text-gray-800">Результат</span>
-                </div>
-                <span className="text-xs text-muted-foreground">Скругленный</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-16 h-8 bg-purple-100 border-2 border-purple-600 rounded-full flex items-center justify-center">
-                  <span className="text-[8px] font-semibold text-gray-800">Время</span>
-                </div>
-                <span className="text-xs text-muted-foreground">Овал</span>
+                <div className="w-4 h-4 border-2 border-red-500 bg-white rounded"></div>
+                <span className="text-red-600">Ветвление</span>
               </div>
             </div>
           </Panel>
@@ -517,106 +496,60 @@ function ProcessDiagramInner({ steps, roles, stages, branches = [] }: ProcessDia
       </div>
 
       {selectedStep && (
-        <div className="w-80 border rounded-lg p-4 bg-background overflow-y-auto max-h-[700px]">
-          <h3 className="font-bold text-lg mb-3">{selectedStep.name}</h3>
-          
-          {selectedStep.input && (
-            <div className="mb-3">
-              <div className="text-sm font-semibold text-gray-700">Вход:</div>
-              <div className="text-sm text-gray-600">{selectedStep.input}</div>
+        <div className="w-80 border rounded-lg p-4 bg-background overflow-y-auto max-h-[800px]">
+          <h3 className="font-bold text-lg mb-4">Детали шага</h3>
+          <div className="space-y-3">
+            <div>
+              <div className="text-sm font-semibold text-muted-foreground">Название</div>
+              <div className="text-sm">{selectedStep.name}</div>
             </div>
-          )}
-
-          {selectedStep.actions && selectedStep.actions.length > 0 && (
-            <div className="mb-3">
-              <div className="text-sm font-semibold text-gray-700 mb-1">
-                Действия:
+            {selectedStep.description && (
+              <div>
+                <div className="text-sm font-semibold text-muted-foreground">Описание</div>
+                <div className="text-sm">{selectedStep.description}</div>
               </div>
-              <ol className="list-decimal list-inside space-y-1">
-                {selectedStep.actions.map((action, idx) => (
-                  <li key={idx} className="text-sm text-gray-600">
-                    {action}
-                  </li>
-                ))}
-              </ol>
-            </div>
-          )}
-
-          {selectedStep.output && (
-            <div className="mb-3">
-              <div className="text-sm font-semibold text-gray-700">Выход:</div>
-              <div className="text-sm text-gray-600">{selectedStep.output}</div>
-            </div>
-          )}
-
-          {selectedStep.mop && (
-            <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded">
-              <div className="text-sm font-bold text-gray-800 mb-2">МОП</div>
-              
-              {selectedStep.mop.materials && selectedStep.mop.materials.length > 0 && (
-                <div className="mb-2">
-                  <div className="text-xs font-semibold text-gray-700">
-                    Материалы:
-                  </div>
-                  <ul className="list-disc list-inside">
-                    {selectedStep.mop.materials.map((item, idx) => (
-                      <li key={idx} className="text-xs text-gray-600">
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {selectedStep.mop.equipment && selectedStep.mop.equipment.length > 0 && (
-                <div className="mb-2">
-                  <div className="text-xs font-semibold text-gray-700">
-                    Оборудование:
-                  </div>
-                  <ul className="list-disc list-inside">
-                    {selectedStep.mop.equipment.map((item, idx) => (
-                      <li key={idx} className="text-xs text-gray-600">
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {selectedStep.mop.personnel && selectedStep.mop.personnel.length > 0 && (
-                <div>
-                  <div className="text-xs font-semibold text-gray-700">
-                    Персонал:
-                  </div>
-                  <ul className="list-disc list-inside">
-                    {selectedStep.mop.personnel.map((item, idx) => (
-                      <li key={idx} className="text-xs text-gray-600">
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          )}
-
-          {selectedStep.tools && selectedStep.tools.length > 0 && (
-            <div className="mb-3">
-              <div className="text-sm font-semibold text-gray-700">
-                Инструменты:
+            )}
+            {(selectedStep.duration || selectedStep.timeEstimate) && (
+              <div>
+                <div className="text-sm font-semibold text-muted-foreground">Время</div>
+                <div className="text-sm">{selectedStep.duration || selectedStep.timeEstimate}</div>
               </div>
-              <div className="text-sm text-gray-600">
-                {selectedStep.tools.join(", ")}
-              </div>
-            </div>
-          )}
-
-          {selectedStep.sla && (
-            <div className="mb-3">
-              <div className="text-sm font-semibold text-gray-700">SLA:</div>
-              <div className="text-sm text-gray-600">{selectedStep.sla}</div>
-            </div>
-          )}
+            )}
+            {selectedStep.mop && (
+              <>
+                {selectedStep.mop.materials && selectedStep.mop.materials.length > 0 && (
+                  <div>
+                    <div className="text-sm font-semibold text-muted-foreground">Материалы</div>
+                    <ul className="text-sm list-disc list-inside">
+                      {selectedStep.mop.materials.map((m: string, i: number) => (
+                        <li key={i}>{m}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {selectedStep.mop.equipment && selectedStep.mop.equipment.length > 0 && (
+                  <div>
+                    <div className="text-sm font-semibold text-muted-foreground">Оборудование</div>
+                    <ul className="text-sm list-disc list-inside">
+                      {selectedStep.mop.equipment.map((e: string, i: number) => (
+                        <li key={i}>{e}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {selectedStep.mop.personnel && selectedStep.mop.personnel.length > 0 && (
+                  <div>
+                    <div className="text-sm font-semibold text-muted-foreground">Персонал</div>
+                    <ul className="text-sm list-disc list-inside">
+                      {selectedStep.mop.personnel.map((p: string, i: number) => (
+                        <li key={i}>{p}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>
