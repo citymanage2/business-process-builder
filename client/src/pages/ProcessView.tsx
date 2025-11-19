@@ -6,13 +6,20 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import ProcessDiagram from "@/components/ProcessDiagram";
 import ProcessDiagramSwimlane from "@/components/ProcessDiagramSwimlane";
+import ProcessDiagramEditable from "@/components/ProcessDiagramEditable";
+import ProcessMetrics from "@/components/ProcessMetrics";
+import CRMFunnels from "@/components/CRMFunnels";
+import RequiredDocuments from "@/components/RequiredDocuments";
+import StageDetails from "@/components/StageDetails";
 import { trpc } from "@/lib/trpc";
-import { Loader2, Sparkles, TrendingUp, AlertTriangle, Target } from "lucide-react";
+import { Loader2, Sparkles, TrendingUp, AlertTriangle, Target, Edit, Eye, Download } from "lucide-react";
 import { toast } from "sonner";
+import { exportProcessToPDF } from "@/lib/pdfExport";
 
 export default function ProcessView() {
   const [, params] = useRoute("/process/:id");
   const processId = params?.id ? parseInt(params.id) : 0;
+  const [editMode, setEditMode] = useState(false);
 
   const { data: process, isLoading } = trpc.processes.get.useQuery({ id: processId });
 
@@ -111,29 +118,104 @@ export default function ProcessView() {
 
       <main className="container mx-auto px-4 py-8">
         <Tabs defaultValue="diagram" className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-3">
+          <TabsList className="grid w-full grid-cols-6 max-w-4xl">
             <TabsTrigger value="diagram">Диаграмма</TabsTrigger>
-            <TabsTrigger value="details">Детали</TabsTrigger>
+            <TabsTrigger value="stages">Этапы</TabsTrigger>
+            <TabsTrigger value="metrics">Метрики</TabsTrigger>
+            <TabsTrigger value="funnels">CRM</TabsTrigger>
+            <TabsTrigger value="documents">Документы</TabsTrigger>
             <TabsTrigger value="recommendations">Рекомендации</TabsTrigger>
           </TabsList>
 
           <TabsContent value="diagram" className="mt-6">
             <Card>
               <CardHeader>
-                <CardTitle>Визуализация процесса</CardTitle>
-                <CardDescription>
-                  Интерактивная BPMN-диаграмма бизнес-процесса
-                </CardDescription>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle>Визуализация процесса</CardTitle>
+                    <CardDescription>
+                      Интерактивная BPMN-диаграмма бизнес-процесса
+                    </CardDescription>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant={editMode ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setEditMode(!editMode)}
+                    >
+                      {editMode ? (
+                        <>
+                          <Eye className="w-4 h-4 mr-2" />
+                          Просмотр
+                        </>
+                      ) : (
+                        <>
+                          <Edit className="w-4 h-4 mr-2" />
+                          Редактировать
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        toast.promise(exportProcessToPDF(process), {
+                          loading: "Генерация PDF...",
+                          success: "PDF успешно создан",
+                          error: "Ошибка при создании PDF",
+                        });
+                      }}
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      PDF
+                    </Button>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
-                <ProcessDiagramSwimlane
-                  steps={process.steps || []}
-                  roles={process.roles || []}
-                  stages={process.stages || []}
-                  title="Кросс-функциональная схема (Swimlane)"
-                />
+                {editMode ? (
+                  <ProcessDiagramEditable
+                    steps={process.steps || []}
+                    roles={process.roles || []}
+                    stages={process.stages || []}
+                    onSave={(updatedSteps) => {
+                      console.log("Сохранение изменений:", updatedSteps);
+                      // TODO: Добавить mutation для сохранения
+                    }}
+                  />
+                ) : (
+                  <ProcessDiagramSwimlane
+                    steps={process.steps || []}
+                    roles={process.roles || []}
+                    stages={process.stages || []}
+                    title="Кросс-функциональная схема (Swimlane)"
+                  />
+                )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="stages" className="mt-6">
+            <StageDetails
+              stages={process.stages || []}
+              stageDetails={process.stageDetails || []}
+            />
+          </TabsContent>
+
+          <TabsContent value="metrics" className="mt-6">
+            <ProcessMetrics
+              totalTime={process.totalTime}
+              totalCost={process.totalCost}
+              salaryData={process.salaryData}
+            />
+          </TabsContent>
+
+          <TabsContent value="funnels" className="mt-6">
+            <CRMFunnels funnels={process.crmFunnels || []} />
+          </TabsContent>
+
+          <TabsContent value="documents" className="mt-6">
+            <RequiredDocuments documents={process.requiredDocuments || []} />
           </TabsContent>
 
           <TabsContent value="details" className="mt-6 space-y-6">
