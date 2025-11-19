@@ -36,6 +36,13 @@ export const companies = mysqlTable("companies", {
   averageCheck: varchar("averageCheck", { length: 100 }),
   productsServices: text("productsServices"),
   itSystems: text("itSystems"),
+  // Расширенные данные из полной анкеты (50 вопросов)
+  businessModel: text("businessModel"),
+  clientSegments: text("clientSegments"),
+  keyProducts: text("keyProducts"),
+  regions: text("regions"),
+  seasonality: text("seasonality"),
+  strategicGoals: text("strategicGoals"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -47,10 +54,15 @@ export type InsertCompany = typeof companies.$inferInsert;
 export const interviews = mysqlTable("interviews", {
   id: int("id").autoincrement().primaryKey(),
   companyId: int("companyId").notNull().references(() => companies.id, { onDelete: "cascade" }),
-  status: mysqlEnum("status", ["in_progress", "completed", "failed"]).default("in_progress").notNull(),
+  interviewType: mysqlEnum("interviewType", ["voice", "form_full", "form_short"]).default("voice").notNull(),
+  status: mysqlEnum("status", ["draft", "in_progress", "completed", "failed"]).default("in_progress").notNull(),
   audioUrl: text("audioUrl"),
   transcript: text("transcript"),
   structuredData: text("structuredData"),
+  // Ответы на вопросы анкеты (JSON)
+  answers: text("answers"),
+  // Прогресс заполнения для черновиков
+  progress: int("progress").default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -110,3 +122,20 @@ export const comments = mysqlTable("comments", {
 
 export type Comment = typeof comments.$inferSelect;
 export type InsertComment = typeof comments.$inferInsert;
+
+// Documents table - прикрепленные документы к компании
+export const documents = mysqlTable("documents", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  fileName: varchar("fileName", { length: 255 }).notNull(),
+  fileUrl: text("fileUrl").notNull(),
+  fileKey: varchar("fileKey", { length: 500 }).notNull(),
+  fileSize: int("fileSize"),
+  mimeType: varchar("mimeType", { length: 100 }),
+  description: text("description"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Document = typeof documents.$inferSelect;
+export type InsertDocument = typeof documents.$inferInsert;

@@ -6,7 +6,9 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import Companies from "./pages/Companies";
+import InterviewChoice from "./pages/InterviewChoice";
 import Interview from "./pages/Interview";
+import FormInterview from "./pages/FormInterview";
 import ProcessGenerate from "./pages/ProcessGenerate";
 import ProcessView from "./pages/ProcessView";
 
@@ -16,7 +18,9 @@ function Router() {
     <Switch>
       <Route path={"/"} component={Home} />
       <Route path="/companies" component={Companies} />
+      <Route path="/interview-choice/:id" component={InterviewChoice} />
       <Route path="/interview/:id" component={Interview} />
+      <Route path="/form-interview/:id/:type" component={FormInterview} />
       <Route path="/process/generate/:companyId/:interviewId" component={ProcessGenerate} />
       <Route path="/process/:id" component={ProcessView} />
       <Route path={"/404"} component={NotFound} />

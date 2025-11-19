@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { 
   InsertUser, users,
@@ -6,7 +6,8 @@ import {
   InsertInterview, interviews,
   InsertBusinessProcess, businessProcesses,
   InsertRecommendation, recommendations,
-  InsertComment, comments
+  InsertComment, comments,
+  InsertDocument, documents
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -209,4 +210,69 @@ export async function deleteComment(id: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await db.delete(comments).where(eq(comments.id, id));
+}
+
+// ============ Documents ============
+
+export async function createDocument(doc: InsertDocument) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.insert(documents).values(doc);
+  return result;
+}
+
+export async function getDocumentsByCompanyId(companyId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const result = await db.select().from(documents).where(eq(documents.companyId, companyId));
+  return result;
+}
+
+export async function deleteDocument(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.delete(documents).where(eq(documents.id, id));
+}
+
+// ============ Interview Drafts ============
+
+export async function saveDraftInterview(interview: InsertInterview) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  if (interview.id) {
+    // Update existing draft
+    await db.update(interviews)
+      .set({
+        answers: interview.answers,
+        progress: interview.progress,
+        status: interview.status || "draft",
+        updatedAt: new Date(),
+      })
+      .where(eq(interviews.id, interview.id));
+    return interview.id;
+  } else {
+    // Create new draft
+    const result = await db.insert(interviews).values({
+      ...interview,
+      status: "draft",
+    });
+    return result[0]?.insertId;
+  }
+}
+
+export async function getDraftInterviews(companyId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const result = await db.select()
+    .from(interviews)
+    .where(and(
+      eq(interviews.companyId, companyId),
+      eq(interviews.status, "draft")
+    ));
+  return result;
 }

@@ -29,11 +29,7 @@ export default function Interview() {
   const startMutation = trpc.interviews.start.useMutation({
     onSuccess: (data) => {
       setInterviewId(data.id);
-      if (data.questions && Array.isArray(data.questions)) {
-        setQuestions(data.questions);
-      } else if (data.questions && data.questions.questions) {
-        setQuestions(data.questions.questions);
-      }
+      // Вопросы теперь задаются статически в новой системе
     },
     onError: (error) => {
       toast.error(`Ошибка: ${error.message}`);

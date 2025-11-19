@@ -227,7 +227,7 @@ export default function Companies() {
                     {company.format && <div>Формат: {company.format}</div>}
                     {company.averageCheck && <div>Средний чек: {company.averageCheck}</div>}
                   </div>
-                  <Link href={`/interview/${company.id}`}>
+                  <Link href={`/interview-choice/${company.id}`}>
                     <Button className="w-full gap-2">
                       Начать интервью <ArrowRight className="w-4 h-4" />
                     </Button>

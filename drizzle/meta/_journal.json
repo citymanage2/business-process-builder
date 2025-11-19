@@ -15,6 +15,13 @@
       "when": 1763439680843,
       "tag": "0001_long_overlord",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1763533198281,
+      "tag": "0002_thankful_molecule_man",
+      "breakpoints": true
     }
   ]
 }

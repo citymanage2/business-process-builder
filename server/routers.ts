@@ -22,6 +22,11 @@ import {
   createComment,
   getProcessComments,
   deleteComment,
+  createDocument,
+  getDocumentsByCompanyId,
+  deleteDocument,
+  saveDraftInterview,
+  getDraftInterviews,
 } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { transcribeAudio } from "./_core/voiceTranscription";
@@ -104,28 +109,7 @@ export const appRouter = router({
           status: "in_progress",
         });
 
-        // Generate interview questions
-        const questionsPrompt = buildQuestionsPrompt({
-          companyName: company.name,
-          industry: company.industry || "Не указано",
-          region: company.region || "Не указано",
-          format: company.format || "Не указано",
-        });
-
-        const response = await invokeLLM({
-          messages: [
-            { role: "system", content: "Ты помощник для создания бизнес-процессов. Отвечай только валидным JSON." },
-            { role: "user", content: questionsPrompt },
-          ],
-          response_format: { type: "json_object" },
-        });
-
-        const content = typeof response.choices[0].message.content === 'string' 
-          ? response.choices[0].message.content 
-          : JSON.stringify(response.choices[0].message.content);
-        const questions = JSON.parse(content);
-
-        return { id, questions };
+        return { id };
       }),
     get: protectedProcedure
       .input(z.object({ id: z.number() }))
@@ -197,7 +181,9 @@ export const appRouter = router({
           throw new Error("Company or interview not found");
         }
 
+        // Формируем контекст компании
         const context = `
+Компания: ${company.name}
 Отрасль: ${company.industry || "Не указано"}
 Регион: ${company.region || "Не указано"}
 Формат: ${company.format || "Не указано"}
@@ -206,7 +192,25 @@ export const appRouter = router({
 ИТ-системы: ${company.itSystems || "Не указано"}
         `;
 
-        const interviewData = interview.structuredData || interview.transcript || "Нет данных";
+        // Обрабатываем данные интервью
+        let interviewData = "";
+        
+        if (interview.answers) {
+          // Если есть ответы из анкеты
+          try {
+            const answers = JSON.parse(interview.answers);
+            interviewData = "Ответы на вопросы анкеты:\n";
+            for (const [questionId, answer] of Object.entries(answers)) {
+              interviewData += `${questionId}: ${answer}\n`;
+            }
+          } catch (e) {
+            console.error("Failed to parse interview answers", e);
+            interviewData = interview.structuredData || interview.transcript || "Нет данных";
+          }
+        } else {
+          // Иначе используем транскрипцию голосового интервью
+          interviewData = interview.structuredData || interview.transcript || "Нет данных";
+        }
 
         const prompt = buildProcessPrompt(context, interviewData);
 
@@ -316,11 +320,7 @@ export const appRouter = router({
           steps: process.steps,
         });
 
-        const prompt = buildRecommendationsPrompt(
-          company.industry || "Не указано",
-          company.region || "Не указано",
-          processData
-        );
+        const prompt = buildRecommendationsPrompt(processData);
 
         const response = await invokeLLM({
           messages: [
@@ -406,6 +406,82 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         await deleteComment(input.id);
         return { success: true };
+      }),
+  }),
+
+  documents: router({
+    upload: protectedProcedure
+      .input(z.object({
+        companyId: z.number(),
+        fileName: z.string(),
+        fileContent: z.string(), // base64
+        mimeType: z.string().optional(),
+        description: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        // Конвертируем base64 в Buffer
+        const buffer = Buffer.from(input.fileContent, 'base64');
+        const fileSize = buffer.length;
+        
+        // Генерируем уникальный ключ файла
+        const timestamp = Date.now();
+        const randomSuffix = Math.random().toString(36).substring(7);
+        const fileKey = `company-${input.companyId}/documents/${timestamp}-${randomSuffix}-${input.fileName}`;
+        
+        // Загружаем в S3
+        const { url } = await storagePut(fileKey, buffer, input.mimeType);
+        
+        // Сохраняем в БД
+        await createDocument({
+          companyId: input.companyId,
+          userId: ctx.user.id,
+          fileName: input.fileName,
+          fileUrl: url,
+          fileKey: fileKey,
+          fileSize: fileSize,
+          mimeType: input.mimeType,
+          description: input.description,
+        });
+        
+        return { url, fileKey };
+      }),
+    list: protectedProcedure
+      .input(z.object({ companyId: z.number() }))
+      .query(async ({ input }) => {
+        return await getDocumentsByCompanyId(input.companyId);
+      }),
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await deleteDocument(input.id);
+        return { success: true };
+      }),
+  }),
+
+  drafts: router({
+    save: protectedProcedure
+      .input(z.object({
+        id: z.number().optional(),
+        companyId: z.number(),
+        interviewType: z.enum(["voice", "form_full", "form_short"]),
+        answers: z.string(), // JSON string
+        progress: z.number(),
+      }))
+      .mutation(async ({ input }) => {
+        const id = await saveDraftInterview({
+          id: input.id,
+          companyId: input.companyId,
+          interviewType: input.interviewType,
+          status: "draft",
+          answers: input.answers,
+          progress: input.progress,
+        });
+        return { id };
+      }),
+    list: protectedProcedure
+      .input(z.object({ companyId: z.number() }))
+      .query(async ({ input }) => {
+        return await getDraftInterviews(input.companyId);
       }),
   }),
 });

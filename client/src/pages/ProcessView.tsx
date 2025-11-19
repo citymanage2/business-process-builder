@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import ProcessDiagram from "@/components/ProcessDiagram";
+import ProcessDiagramSwimlane from "@/components/ProcessDiagramSwimlane";
 import { trpc } from "@/lib/trpc";
 import { Loader2, Sparkles, TrendingUp, AlertTriangle, Target } from "lucide-react";
 import { toast } from "sonner";
@@ -125,11 +126,11 @@ export default function ProcessView() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <ProcessDiagram
+                <ProcessDiagramSwimlane
                   steps={process.steps || []}
                   roles={process.roles || []}
                   stages={process.stages || []}
-                  branches={process.branches || []}
+                  title="Кросс-функциональная схема (Swimlane)"
                 />
               </CardContent>
             </Card>
