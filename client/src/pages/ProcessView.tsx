@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import ProcessDiagram from "@/components/ProcessDiagram";
 import ProcessDiagramSwimlane from "@/components/ProcessDiagramSwimlane";
 import ProcessDiagramEditable from "@/components/ProcessDiagramEditable";
+import ProcessModificationDialog from "@/components/ProcessModificationDialog";
 import ProcessMetrics from "@/components/ProcessMetrics";
 import CRMFunnels from "@/components/CRMFunnels";
 import RequiredDocuments from "@/components/RequiredDocuments";
@@ -138,6 +139,14 @@ export default function ProcessView() {
                     </CardDescription>
                   </div>
                   <div className="flex gap-2">
+                    <ProcessModificationDialog
+                      processId={processId}
+                      onSubmit={(request) => {
+                        console.log("Запрос на изменение:", request);
+                        toast.info("Функция в разработке");
+                        // TODO: Добавить mutation для обработки запроса
+                      }}
+                    />
                     <Button
                       variant={editMode ? "default" : "outline"}
                       size="sm"

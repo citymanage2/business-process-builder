@@ -7,6 +7,8 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  useDroppable,
+  useDraggable,
 } from "@dnd-kit/core";
 import { Button } from "@/components/ui/button";
 import { Save } from "lucide-react";
@@ -124,8 +126,8 @@ export default function ProcessDiagramEditable({ steps: initialSteps, roles, sta
       </div>
 
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div className="overflow-x-auto">
-          <div className="inline-block min-w-full">
+        <div className="overflow-x-auto overflow-y-visible border rounded-lg">
+          <div className="inline-block min-w-max">
             {/* Заголовки этапов */}
             <div className="flex border-b-2 border-gray-300">
               <div className="w-48 flex-shrink-0 bg-gray-50 p-4 font-semibold">Роли</div>
@@ -208,8 +210,8 @@ function DroppableCell({
   return (
     <div
       ref={setNodeRef}
-      className={`min-w-[300px] min-h-[120px] flex-shrink-0 p-2 border-l border-gray-300 ${
-        isOver ? "bg-blue-50" : "bg-white"
+      className={`min-w-[300px] min-h-[150px] flex-shrink-0 p-2 border-l border-gray-300 transition-colors ${
+        isOver ? "bg-blue-100 border-blue-400" : "bg-white"
       }`}
     >
       <div className="space-y-2">
@@ -262,6 +264,4 @@ function DraggableStep({
   );
 }
 
-// Хуки из @dnd-kit
-import { useDroppable } from "@dnd-kit/core";
-import { useDraggable } from "@dnd-kit/core";
+
