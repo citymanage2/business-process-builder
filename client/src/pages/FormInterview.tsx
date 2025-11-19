@@ -182,21 +182,35 @@ export default function FormInterview() {
     switch (question.type) {
       case "text":
         return (
-          <Input
-            value={value}
-            onChange={(e) => handleAnswerChange(question.id, e.target.value)}
-            placeholder={question.placeholder}
-          />
+          <div className="space-y-2">
+            <Input
+              value={value}
+              onChange={(e) => handleAnswerChange(question.id, e.target.value)}
+              placeholder="Ваш ответ..."
+            />
+            {question.placeholder && (
+              <p className="text-sm text-muted-foreground select-text">
+                <span className="font-medium">Пример:</span> {question.placeholder}
+              </p>
+            )}
+          </div>
         );
 
       case "textarea":
         return (
-          <Textarea
-            value={value}
-            onChange={(e) => handleAnswerChange(question.id, e.target.value)}
-            placeholder={question.placeholder}
-            rows={4}
-          />
+          <div className="space-y-2">
+            <Textarea
+              value={value}
+              onChange={(e) => handleAnswerChange(question.id, e.target.value)}
+              placeholder="Ваш ответ..."
+              rows={4}
+            />
+            {question.placeholder && (
+              <p className="text-sm text-muted-foreground select-text">
+                <span className="font-medium">Пример:</span> {question.placeholder}
+              </p>
+            )}
+          </div>
         );
 
       case "select":
