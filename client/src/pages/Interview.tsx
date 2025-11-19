@@ -24,7 +24,10 @@ export default function Interview() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [interviewId, setInterviewId] = useState<number | null>(null);
 
-  const { data: company } = trpc.companies.get.useQuery({ id: companyId });
+  const { data: company } = trpc.companies.get.useQuery(
+    { id: companyId },
+    { enabled: companyId > 0 }
+  );
 
   const startMutation = trpc.interviews.start.useMutation({
     onSuccess: (data) => {

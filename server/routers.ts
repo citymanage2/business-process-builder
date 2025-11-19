@@ -295,10 +295,10 @@ export const appRouter = router({
           itIntegration: process.itIntegration ? JSON.parse(process.itIntegration) : {},
           diagramData: process.diagramData ? JSON.parse(process.diagramData) : null,
           // Новые поля
-          stageDetails: process.stageDetails ? JSON.parse(process.stageDetails) : [],
-          crmFunnels: process.crmFunnels ? JSON.parse(process.crmFunnels) : [],
-          requiredDocuments: process.requiredDocuments ? JSON.parse(process.requiredDocuments) : [],
-          salaryData: process.salaryData ? JSON.parse(process.salaryData) : [],
+          stageDetails: (process.stageDetails && process.stageDetails !== 'null') ? JSON.parse(process.stageDetails) : [],
+          crmFunnels: (process.crmFunnels && process.crmFunnels !== 'null') ? JSON.parse(process.crmFunnels) : [],
+          requiredDocuments: (process.requiredDocuments && process.requiredDocuments !== 'null') ? JSON.parse(process.requiredDocuments) : [],
+          salaryData: (process.salaryData && process.salaryData !== 'null') ? JSON.parse(process.salaryData) : [],
         };
       }),
     update: protectedProcedure
