@@ -262,6 +262,13 @@ export const appRouter = router({
           documents: JSON.stringify(processData.documents),
           itIntegration: JSON.stringify(processData.itIntegration),
           diagramData: JSON.stringify(processData),
+          // Новые поля
+          stageDetails: processData.stageDetails ? JSON.stringify(processData.stageDetails) : null,
+          totalTime: processData.metrics?.totalTimeMinutes || null,
+          totalCost: processData.metrics?.totalCostRub || null,
+          crmFunnels: processData.crmFunnels ? JSON.stringify(processData.crmFunnels) : null,
+          requiredDocuments: processData.missingDocuments ? JSON.stringify(processData.missingDocuments) : null,
+          salaryData: processData.metrics?.roleWorkload ? JSON.stringify(processData.metrics.roleWorkload) : null,
           status: "draft",
         });
 
@@ -287,6 +294,11 @@ export const appRouter = router({
           documents: process.documents ? JSON.parse(process.documents) : [],
           itIntegration: process.itIntegration ? JSON.parse(process.itIntegration) : {},
           diagramData: process.diagramData ? JSON.parse(process.diagramData) : null,
+          // Новые поля
+          stageDetails: process.stageDetails ? JSON.parse(process.stageDetails) : [],
+          crmFunnels: process.crmFunnels ? JSON.parse(process.crmFunnels) : [],
+          requiredDocuments: process.requiredDocuments ? JSON.parse(process.requiredDocuments) : [],
+          salaryData: process.salaryData ? JSON.parse(process.salaryData) : [],
         };
       }),
     update: protectedProcedure

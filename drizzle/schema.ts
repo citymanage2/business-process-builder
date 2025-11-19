@@ -88,6 +88,13 @@ export const businessProcesses = mysqlTable("businessProcesses", {
   documents: text("documents"),
   itIntegration: text("itIntegration"),
   diagramData: text("diagramData"),
+  // Расширенные данные для новой функциональности
+  stageDetails: text("stageDetails"), // Детальное описание каждого этапа (JSON)
+  totalTime: int("totalTime"), // Общее время процесса в минутах
+  totalCost: int("totalCost"), // Общая стоимость процесса по ФОТ в рублях
+  crmFunnels: text("crmFunnels"), // 3 варианта воронок CRM (JSON)
+  requiredDocuments: text("requiredDocuments"), // Список необходимых документов (JSON)
+  salaryData: text("salaryData"), // Данные о зарплатах ролей (JSON)
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
