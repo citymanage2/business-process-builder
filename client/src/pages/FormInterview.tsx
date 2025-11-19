@@ -58,9 +58,11 @@ export default function FormInterview() {
     },
   });
 
-  // Загрузка черновика при монтировании
+  // Загрузка черновика при монтировании (только один раз)
+  const [draftLoaded, setDraftLoaded] = useState(false);
+  
   useEffect(() => {
-    if (drafts && drafts.length > 0) {
+    if (drafts && drafts.length > 0 && !draftLoaded) {
       const draft = drafts[0];
       setDraftId(draft.id);
       if (draft.answers) {
@@ -70,8 +72,9 @@ export default function FormInterview() {
           console.error("Failed to parse draft answers", e);
         }
       }
+      setDraftLoaded(true);
     }
-  }, [drafts]);
+  }, [drafts, draftLoaded]);
 
   const handleAnswerChange = (questionId: string, value: string) => {
     setAnswers(prev => ({ ...prev, [questionId]: value }));
