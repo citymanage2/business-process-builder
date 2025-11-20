@@ -170,3 +170,9 @@
 ## Исправление ошибок API (19.11.2025)
 - [x] Исправить ошибку companies.get с id:0 на странице процесса
 - [x] Исправить ошибку Cannot read properties of undefined (reading 'length') в CRMFunnels
+
+## Подготовка к GitHub (19.11.2025)
+- [x] Создать README.md с описанием проекта
+- [x] Создать .gitignore для проекта (уже существует)
+- [x] Создать LICENSE файл
+- [x] Написать инструкцию по подключению домена reg.ru
