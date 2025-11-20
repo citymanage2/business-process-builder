@@ -83,22 +83,22 @@ export default function ProcessView() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex justify-between items-start">
-            <div>
-              <h1 className="text-2xl font-bold">{process.title}</h1>
-              <p className="text-muted-foreground mt-1">{process.description}</p>
-              <div className="flex gap-2 mt-2">
-                <Badge variant="outline">{process.startEvent}</Badge>
-                <Badge variant="outline">{process.endEvent}</Badge>
+      <header className="border-b bg-card">
+        <div className="container mx-auto px-4 py-6">
+          <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-2xl md:text-3xl font-bold mb-2">{process.title}</h1>
+              <p className="text-muted-foreground mb-3 break-words">{process.description}</p>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline" className="whitespace-nowrap">{process.startEvent}</Badge>
+                <Badge variant="outline" className="whitespace-nowrap">{process.endEvent}</Badge>
               </div>
             </div>
             {(!recommendationsQuery.data || recommendationsQuery.data.length === 0) && (
               <Button
                 onClick={handleGenerateRecommendations}
                 disabled={generateRecommendationsMutation.isPending}
-                className="gap-2"
+                className="gap-2 flex-shrink-0 whitespace-nowrap"
               >
                 {generateRecommendationsMutation.isPending ? (
                   <>
@@ -131,14 +131,14 @@ export default function ProcessView() {
           <TabsContent value="diagram" className="mt-6">
             <Card>
               <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle>Визуализация процесса</CardTitle>
-                    <CardDescription>
+                <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
+                  <div className="flex-1 min-w-0">
+                    <CardTitle className="mb-2">Визуализация процесса</CardTitle>
+                    <CardDescription className="break-words">
                       Интерактивная BPMN-диаграмма бизнес-процесса
                     </CardDescription>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <ProcessModificationDialog
                       processId={processId}
                       onSubmit={(request) => {
@@ -319,15 +319,15 @@ export default function ProcessView() {
                   return (
                     <Card key={rec.id}>
                       <CardHeader>
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-start gap-3">
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                          <div className="flex items-start gap-3 flex-1 min-w-0">
                             <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                               <Icon className="w-5 h-5 text-primary" />
                             </div>
-                            <div>
-                              <div className="flex items-center gap-2 mb-1">
-                                <CardTitle className="text-lg">{rec.title}</CardTitle>
-                                <Badge variant={priorityColors[rec.priority] as any}>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex flex-wrap items-center gap-2 mb-2">
+                                <CardTitle className="text-lg break-words">{rec.title}</CardTitle>
+                                <Badge variant={priorityColors[rec.priority] as any} className="whitespace-nowrap">
                                   {rec.priority === "high"
                                     ? "Высокий"
                                     : rec.priority === "medium"
@@ -335,13 +335,13 @@ export default function ProcessView() {
                                     : "Низкий"}
                                 </Badge>
                               </div>
-                              <Badge variant="outline">{categoryLabels[rec.category]}</Badge>
+                              <Badge variant="outline" className="whitespace-nowrap">{categoryLabels[rec.category]}</Badge>
                             </div>
                           </div>
                         </div>
                       </CardHeader>
                       <CardContent>
-                        <p className="text-muted-foreground mb-4">{rec.description}</p>
+                        <p className="text-muted-foreground mb-4 break-words">{rec.description}</p>
                         {rec.toolsSuggested && rec.toolsSuggested.length > 0 && (
                           <div>
                             <div className="text-sm font-semibold mb-2">Рекомендуемые инструменты:</div>
