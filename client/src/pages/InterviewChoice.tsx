@@ -2,7 +2,8 @@ import { useRoute, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
-import { FileText, Mic, CheckCircle2, Clock, Loader2 } from "lucide-react";
+import { FileText, Mic, CheckCircle2, Clock, Loader2, ArrowRight } from "lucide-react";
+import { useEffect } from "react";
 
 export default function InterviewChoice() {
   const [, params] = useRoute("/interview-choice/:id");
@@ -10,6 +11,22 @@ export default function InterviewChoice() {
   const companyId = params?.id ? parseInt(params.id) : 0;
 
   const { data: company, isLoading } = trpc.companies.get.useQuery({ id: companyId });
+  const { data: allProcesses } = trpc.processes.list.useQuery({ companyId });
+  const { data: drafts } = trpc.drafts.list.useQuery({ companyId });
+
+  // Автопереход к результатам если интервью завершено
+  useEffect(() => {
+    if (allProcesses && allProcesses.length > 0) {
+      const companyProcess = allProcesses.find(p => p.companyId === companyId);
+      if (companyProcess) {
+        // Есть готовый процесс - переходим к нему
+        setLocation(`/process/${companyProcess.id}`);
+      }
+    }
+  }, [allProcesses, setLocation, companyId]);
+
+  const completedDraft = drafts?.find(d => d.progress === 100);
+  const hasCompletedInterview = !!completedDraft;
 
   if (isLoading) {
     return (
@@ -141,6 +158,28 @@ export default function InterviewChoice() {
           </CardContent>
         </Card>
       </div>
+
+      {hasCompletedInterview && (
+        <div className="mt-8 p-6 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
+          <div className="flex items-start gap-4">
+            <CheckCircle2 className="w-6 h-6 text-green-600 flex-shrink-0 mt-1" />
+            <div className="flex-1">
+              <h3 className="font-semibold text-green-900 dark:text-green-100 mb-2">
+                Интервью уже завершено
+              </h3>
+              <p className="text-sm text-green-800 dark:text-green-200 mb-4">
+                Вы уже прошли интервью для этой компании. Вы можете перейти к результатам или пройти интервью заново другим способом.
+              </p>
+              <Button 
+                onClick={() => setLocation(`/process/generate/${companyId}/${completedDraft.id}`)}
+                className="gap-2"
+              >
+                Перейти к результатам <ArrowRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="mt-8 p-4 bg-muted rounded-lg">
         <h3 className="font-semibold mb-2">💡 Совет</h3>

@@ -2,13 +2,14 @@ import { useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
-import { Plus, Building2, ArrowRight, Loader2 } from "lucide-react";
+import { Plus, Building2, ArrowRight, Loader2, Trash2, User } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 
@@ -47,6 +48,16 @@ export default function Companies() {
     },
   });
 
+  const deleteMutation = trpc.companies.delete.useMutation({
+    onSuccess: () => {
+      toast.success("Компания удалена");
+      refetch();
+    },
+    onError: (error) => {
+      toast.error(`Ошибка: ${error.message}`);
+    },
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name) {
@@ -73,13 +84,20 @@ export default function Companies() {
               <h1 className="text-2xl font-bold">Мои компании</h1>
               <p className="text-muted-foreground">Управляйте бизнес-процессами ваших компаний</p>
             </div>
-            <Dialog open={open} onOpenChange={setOpen}>
-              <DialogTrigger asChild>
-                <Button className="gap-2">
-                  <Plus className="w-4 h-4" />
-                  Добавить компанию
+            <div className="flex items-center gap-3">
+              <Link href="/profile">
+                <Button variant="outline" className="gap-2">
+                  <User className="w-4 h-4" />
+                  Профиль
                 </Button>
-              </DialogTrigger>
+              </Link>
+              <Dialog open={open} onOpenChange={setOpen}>
+                <DialogTrigger asChild>
+                  <Button className="gap-2">
+                    <Plus className="w-4 h-4" />
+                    Добавить компанию
+                  </Button>
+                </DialogTrigger>
               <DialogContent className="max-w-2xl">
                 <DialogHeader>
                   <DialogTitle>Новая компания</DialogTitle>
@@ -186,8 +204,9 @@ export default function Companies() {
                     </Button>
                   </div>
                 </form>
-              </DialogContent>
-            </Dialog>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
         </div>
       </header>
@@ -227,11 +246,38 @@ export default function Companies() {
                     {company.format && <div>Формат: {company.format}</div>}
                     {company.averageCheck && <div>Средний чек: {company.averageCheck}</div>}
                   </div>
-                  <Link href={`/interview-choice/${company.id}`}>
-                    <Button className="w-full gap-2">
-                      Начать интервью <ArrowRight className="w-4 h-4" />
-                    </Button>
-                  </Link>
+                  <div className="flex gap-2">
+                    <Link href={`/interview-choice/${company.id}`} className="flex-1">
+                      <Button className="w-full gap-2">
+                        Начать интервью <ArrowRight className="w-4 h-4" />
+                      </Button>
+                    </Link>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="destructive" size="icon">
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Удалить компанию?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Вы уверены, что хотите удалить компанию <strong>{company.name}</strong>?
+                            Это действие нельзя отменить. Все связанные интервью, процессы и документы будут удалены.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Отмена</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => deleteMutation.mutate({ id: company.id })}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Удалить
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
                 </CardContent>
               </Card>
             ))}

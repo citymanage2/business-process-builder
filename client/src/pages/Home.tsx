@@ -24,11 +24,16 @@ export default function Home() {
             <GitBranch className="w-6 h-6 text-primary" />
             <h1 className="text-xl font-bold">{APP_TITLE}</h1>
           </div>
-          <div>
+          <div className="flex items-center gap-3">
             {isAuthenticated ? (
-              <Link href="/companies">
-                <Button>Мои компании</Button>
-              </Link>
+              <>
+                <Link href="/profile">
+                  <Button variant="ghost">Профиль</Button>
+                </Link>
+                <Link href="/companies">
+                  <Button>Мои компании</Button>
+                </Link>
+              </>
             ) : (
               <a href={getLoginUrl()}>
                 <Button>Войти</Button>
