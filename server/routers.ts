@@ -17,6 +17,7 @@ import {
   getCompanyProcesses,
   getProcessById,
   updateBusinessProcess,
+  deleteBusinessProcess,
   createRecommendation,
   getProcessRecommendations,
   createComment,
@@ -311,6 +312,12 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         const { id, ...data } = input;
         await updateBusinessProcess(id, data);
+        return { success: true };
+      }),
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await deleteBusinessProcess(input.id);
         return { success: true };
       }),
   }),

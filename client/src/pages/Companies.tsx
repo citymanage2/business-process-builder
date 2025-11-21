@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
-import { Plus, Building2, ArrowRight, Loader2, Trash2, User } from "lucide-react";
+import { Plus, Building2, ArrowRight, Loader2, Trash2, User, FileText } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 
@@ -246,16 +246,26 @@ export default function Companies() {
                     {company.format && <div>Формат: {company.format}</div>}
                     {company.averageCheck && <div>Средний чек: {company.averageCheck}</div>}
                   </div>
-                  <div className="flex gap-2">
-                    <Link href={`/interview-choice/${company.id}`} className="flex-1">
-                      <Button className="w-full gap-2">
-                        Начать интервью <ArrowRight className="w-4 h-4" />
-                      </Button>
-                    </Link>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex gap-2">
+                      <Link href={`/company/${company.id}/processes`} className="flex-1">
+                        <Button variant="outline" className="w-full gap-2" size="sm">
+                          <FileText className="w-4 h-4" />
+                          Процессы
+                        </Button>
+                      </Link>
+                      <Link href={`/interview-choice/${company.id}`} className="flex-1">
+                        <Button className="w-full gap-2" size="sm">
+                          <Plus className="w-4 h-4" />
+                          Создать
+                        </Button>
+                      </Link>
+                    </div>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button variant="destructive" size="icon">
+                        <Button variant="outline" size="sm" className="w-full gap-2 text-destructive hover:bg-destructive hover:text-destructive-foreground">
                           <Trash2 className="w-4 h-4" />
+                          Удалить
                         </Button>
                       </AlertDialogTrigger>
                       <AlertDialogContent>
@@ -272,7 +282,14 @@ export default function Companies() {
                             onClick={() => deleteMutation.mutate({ id: company.id })}
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                           >
-                            Удалить
+                            {deleteMutation.isPending ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                Удаление...
+                              </>
+                            ) : (
+                              "Удалить"
+                            )}
                           </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>

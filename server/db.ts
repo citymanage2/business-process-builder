@@ -178,6 +178,17 @@ export async function updateBusinessProcess(id: number, data: Partial<InsertBusi
   await db.update(businessProcesses).set(data).where(eq(businessProcesses.id, id));
 }
 
+export async function deleteBusinessProcess(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  // Удаляем связанные рекомендации
+  await db.delete(recommendations).where(eq(recommendations.businessProcessId, id));
+  // Удаляем связанные комментарии
+  await db.delete(comments).where(eq(comments.businessProcessId, id));
+  // Удаляем сам процесс
+  await db.delete(businessProcesses).where(eq(businessProcesses.id, id));
+}
+
 // Recommendations
 export async function createRecommendation(recommendation: InsertRecommendation) {
   const db = await getDb();

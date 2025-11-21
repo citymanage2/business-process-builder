@@ -12,6 +12,7 @@ import FormInterview from "./pages/FormInterview";
 import ProcessGenerate from "./pages/ProcessGenerate";
 import ProcessView from "./pages/ProcessView";
 import Profile from "./pages/Profile";
+import CompanyProcesses from "./pages/CompanyProcesses";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -25,6 +26,7 @@ function Router() {
       <Route path="/process/generate/:companyId/:interviewId" component={ProcessGenerate} />
       <Route path="/process/:id" component={ProcessView} />
       <Route path="/profile" component={Profile} />
+      <Route path="/company/:id/processes" component={CompanyProcesses} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />
