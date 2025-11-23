@@ -43,12 +43,12 @@ export default function ProcessDiagramSwimlane({ roles, stages, steps, title }: 
   const [selectedStep, setSelectedStep] = useState<Step | null>(null);
 
   // Константы для размеров
-  const STAGE_HEADER_HEIGHT = 60;
-  const ROLE_LABEL_WIDTH = 180;
-  const STEP_WIDTH = 200;
-  const STEP_HEIGHT = 120;
-  const STEP_MARGIN = 40;
-  const LANE_HEIGHT = STEP_HEIGHT + STEP_MARGIN * 2;
+  const STAGE_HEADER_HEIGHT = 80;
+  const ROLE_LABEL_WIDTH = 220;
+  const STEP_WIDTH = 260;
+  const STEP_HEIGHT = 140;
+  const STEP_MARGIN = 60;
+  const LANE_HEIGHT = STEP_HEIGHT + STEP_MARGIN * 3;
 
   // Цветовая палитра для ролей
   const ROLE_COLORS = [
@@ -81,7 +81,7 @@ export default function ProcessDiagramSwimlane({ roles, stages, steps, title }: 
     ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
     // Рисуем заголовки этапов сверху
-    ctx.font = "bold 14px sans-serif";
+    ctx.font = "bold 16px sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     
@@ -123,7 +123,7 @@ export default function ProcessDiagramSwimlane({ roles, stages, steps, title }: 
       ctx.strokeRect(0, y, ROLE_LABEL_WIDTH, LANE_HEIGHT);
       
       ctx.fillStyle = "#333";
-      ctx.font = "bold 13px sans-serif";
+      ctx.font = "bold 14px sans-serif";
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
       
@@ -210,19 +210,19 @@ export default function ProcessDiagramSwimlane({ roles, stages, steps, title }: 
           
           // Текст внутри блока
           ctx.fillStyle = step.type === "Start" || step.type === "End" ? "#ffffff" : "#000000";
-          ctx.font = "bold 12px sans-serif";
+          ctx.font = "bold 13px sans-serif";
           ctx.textAlign = "center";
           ctx.textBaseline = "top";
           
           // ID шага
-          ctx.fillText(step.id, x + STEP_WIDTH / 2, y + 8);
+          ctx.fillText(step.id, x + STEP_WIDTH / 2, y + 12);
           
           // Название шага (перенос по словам)
-          ctx.font = "11px sans-serif";
+          ctx.font = "12px sans-serif";
           const nameWords = (step.name || "").split(" ");
           let nameLine = "";
-          let nameY = y + 28;
-          const maxWidth = STEP_WIDTH - 16;
+          let nameY = y + 35;
+          const maxWidth = STEP_WIDTH - 24;
           
           nameWords.forEach((word, i) => {
             const testLine = nameLine + word + " ";
@@ -231,7 +231,7 @@ export default function ProcessDiagramSwimlane({ roles, stages, steps, title }: 
             if (metrics.width > maxWidth && i > 0) {
               ctx.fillText(nameLine, x + STEP_WIDTH / 2, nameY);
               nameLine = word + " ";
-              nameY += 14;
+              nameY += 16;
             } else {
               nameLine = testLine;
             }
@@ -242,9 +242,9 @@ export default function ProcessDiagramSwimlane({ roles, stages, steps, title }: 
           
           // Длительность внизу
           if (step.duration) {
-            ctx.font = "10px sans-serif";
+            ctx.font = "11px sans-serif";
             ctx.fillStyle = "#666";
-            ctx.fillText(step.duration, x + STEP_WIDTH / 2, y + STEP_HEIGHT - 12);
+            ctx.fillText(step.duration, x + STEP_WIDTH / 2, y + STEP_HEIGHT - 16);
           }
         });
       });
