@@ -190,3 +190,21 @@ export const supportMessages = mysqlTable("supportMessages", {
 
 export type SupportMessage = typeof supportMessages.$inferSelect;
 export type InsertSupportMessage = typeof supportMessages.$inferInsert;
+
+/**
+ * FAQ articles table for knowledge base
+ */
+export const faqArticles = mysqlTable("faq_articles", {
+  id: int("id").autoincrement().primaryKey(),
+  question: text("question").notNull(),
+  answer: text("answer").notNull(),
+  keywords: text("keywords").notNull(), // Comma-separated keywords for search
+  category: varchar("category", { length: 100 }),
+  order: int("order").default(0).notNull(), // Display order
+  isPublished: int("is_published").default(1).notNull(), // 1 = published, 0 = draft
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type FaqArticle = typeof faqArticles.$inferSelect;
+export type InsertFaqArticle = typeof faqArticles.$inferInsert;

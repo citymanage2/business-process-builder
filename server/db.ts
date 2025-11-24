@@ -1,4 +1,4 @@
-import { eq, and } from "drizzle-orm";
+import { eq, like, or, and } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { 
   InsertUser, users,
@@ -10,7 +10,8 @@ import {
   InsertDocument, documents,
   InsertErrorLog, errorLogs,
   InsertSupportChat, supportChats,
-  InsertSupportMessage, supportMessages
+  InsertSupportMessage, supportMessages,
+  InsertFaqArticle, faqArticles, FaqArticle
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -583,4 +584,76 @@ export async function getUnreadMessagesCount(chatId: number, role: "user" | "adm
     );
 
   return result.length;
+}
+
+// =====================
+// FAQ Articles
+// =====================
+
+export async function getAllFaqArticles(): Promise<FaqArticle[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const result = await db
+    .select()
+    .from(faqArticles)
+    .where(eq(faqArticles.isPublished, 1))
+    .orderBy(faqArticles.order, faqArticles.id);
+  
+  return result;
+}
+
+export async function searchFaqByKeywords(query: string): Promise<FaqArticle[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const searchTerm = `%${query.toLowerCase()}%`;
+  
+  const result = await db
+    .select()
+    .from(faqArticles)
+    .where(
+      and(
+        eq(faqArticles.isPublished, 1),
+        or(
+          like(faqArticles.question, searchTerm),
+          like(faqArticles.answer, searchTerm),
+          like(faqArticles.keywords, searchTerm)
+        )
+      )
+    )
+    .orderBy(faqArticles.order, faqArticles.id)
+    .limit(5);
+  
+  return result;
+}
+
+export async function createFaqArticle(article: InsertFaqArticle): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.insert(faqArticles).values(article);
+  return result[0].insertId;
+}
+
+export async function updateFaqArticle(id: number, article: Partial<InsertFaqArticle>): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.update(faqArticles).set(article).where(eq(faqArticles.id, id));
+}
+
+export async function deleteFaqArticle(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.delete(faqArticles).where(eq(faqArticles.id, id));
+}
+
+export async function getFaqArticleById(id: number): Promise<FaqArticle | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  
+  const result = await db.select().from(faqArticles).where(eq(faqArticles.id, id)).limit(1);
+  return result[0];
 }

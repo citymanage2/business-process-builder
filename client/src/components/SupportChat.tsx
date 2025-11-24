@@ -21,6 +21,7 @@ export default function SupportChat() {
   const [isOpen, setIsOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [chatId, setChatId] = useState<number | null>(null);
+  const [suggestions, setSuggestions] = useState<Array<{ id: number; question: string; answer: string }>>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Получить или создать чат
@@ -34,10 +35,18 @@ export default function SupportChat() {
     { enabled: !!chatId, refetchInterval: 3000 } // Polling каждые 3 секунды
   );
 
+  // Поиск FAQ по ключевым словам
+  const [searchQuery, setSearchQuery] = useState("");
+  const { data: faqResults = [] } = trpc.faq.search.useQuery(
+    { query: searchQuery },
+    { enabled: searchQuery.length > 3 }
+  );
+
   // Отправить сообщение
   const sendMessageMutation = trpc.support.sendMessage.useMutation({
     onSuccess: () => {
       setMessage("");
+      setSuggestions([]);
       refetchMessages();
     },
   });
@@ -78,6 +87,28 @@ export default function SupportChat() {
       e.preventDefault();
       handleSend();
     }
+  };
+
+  // Поиск подсказок при вводе текста
+  useEffect(() => {
+    if (message.trim().length > 3) {
+      const timer = setTimeout(() => {
+        setSearchQuery(message.trim());
+      }, 500);
+      return () => clearTimeout(timer);
+    } else {
+      setSearchQuery("");
+    }
+  }, [message]);
+
+  // Обновить подсказки при получении результатов
+  useEffect(() => {
+    setSuggestions(faqResults);
+  }, [faqResults]);
+
+  const handleSuggestionClick = (answer: string) => {
+    setMessage(answer);
+    setSuggestions([]);
   };
 
   if (!isAuthenticated) return null;
@@ -136,6 +167,24 @@ export default function SupportChat() {
             ))}
             <div ref={messagesEndRef} />
           </div>
+
+          {/* FAQ Подсказки */}
+          {suggestions.length > 0 && (
+            <div className="px-4 py-2 border-t bg-muted/30 max-h-32 overflow-y-auto">
+              <p className="text-xs text-muted-foreground mb-2">Возможно, это поможет:</p>
+              <div className="space-y-1">
+                {suggestions.map((suggestion) => (
+                  <button
+                    key={suggestion.id}
+                    onClick={() => handleSuggestionClick(suggestion.question)}
+                    className="w-full text-left text-xs p-2 rounded hover:bg-muted transition-colors"
+                  >
+                    <p className="font-medium text-primary">{suggestion.question}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Input */}
           <div className="p-4 border-t">

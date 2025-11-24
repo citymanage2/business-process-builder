@@ -40,6 +40,12 @@ import {
   getAllSupportChats,
   markMessagesAsRead,
   getUnreadMessagesCount,
+  getAllFaqArticles,
+  searchFaqByKeywords,
+  createFaqArticle,
+  updateFaqArticle,
+  deleteFaqArticle,
+  getFaqArticleById,
 } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { transcribeAudio } from "./_core/voiceTranscription";
@@ -623,6 +629,16 @@ export const appRouter = router({
           "user",
           input.message
         );
+        
+        // Отправить уведомление администратору
+        const { notifyOwner } = await import("./_core/notification");
+        await notifyOwner({
+          title: `Новое сообщение в чате поддержки от ${ctx.user.name || 'пользователя'}`,
+          content: `Пользователь: ${ctx.user.name || 'Неизвестно'} (${ctx.user.email || 'нет email'})\n\nСообщение: ${input.message}\n\nОтветьте в админ-панели: /admin/support`,
+        }).catch(err => {
+          console.error('[Support] Failed to send notification:', err);
+        });
+        
         return { success: true };
       }),
 
@@ -677,6 +693,77 @@ export const appRouter = router({
           throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
         }
         await markMessagesAsRead(input.chatId, "admin");
+        return { success: true };
+      }),
+  }),
+
+  // FAQ (База знаний)
+  faq: router({
+    // Получить все опубликованные статьи FAQ
+    getAll: publicProcedure
+      .query(async () => {
+        return await getAllFaqArticles();
+      }),
+
+    // Поиск по ключевым словам
+    search: publicProcedure
+      .input(z.object({ query: z.string() }))
+      .query(async ({ input }) => {
+        return await searchFaqByKeywords(input.query);
+      }),
+
+    // Получить статью по ID
+    getById: publicProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        return await getFaqArticleById(input.id);
+      }),
+
+    // Админ: создать статью
+    create: protectedProcedure
+      .input(z.object({
+        question: z.string(),
+        answer: z.string(),
+        keywords: z.string(),
+        category: z.string().optional(),
+        order: z.number().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== 'admin') {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+        }
+        const id = await createFaqArticle(input);
+        return { id };
+      }),
+
+    // Админ: обновить статью
+    update: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        question: z.string().optional(),
+        answer: z.string().optional(),
+        keywords: z.string().optional(),
+        category: z.string().optional(),
+        order: z.number().optional(),
+        isPublished: z.number().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== 'admin') {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+        }
+        const { id, ...data } = input;
+        await updateFaqArticle(id, data);
+        return { success: true };
+      }),
+
+    // Админ: удалить статью
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== 'admin') {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+        }
+        await deleteFaqArticle(input.id);
         return { success: true };
       }),
   }),
