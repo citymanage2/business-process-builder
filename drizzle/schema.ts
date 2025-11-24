@@ -164,3 +164,29 @@ export const errorLogs = mysqlTable("errorLogs", {
 
 export type ErrorLog = typeof errorLogs.$inferSelect;
 export type InsertErrorLog = typeof errorLogs.$inferInsert;
+// Support chats table - чаты поддержки
+export const supportChats = mysqlTable("supportChats", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  status: mysqlEnum("status", ["open", "closed"]).default("open").notNull(),
+  lastMessageAt: timestamp("lastMessageAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type SupportChat = typeof supportChats.$inferSelect;
+export type InsertSupportChat = typeof supportChats.$inferInsert;
+
+// Support messages table - сообщения в чатах поддержки
+export const supportMessages = mysqlTable("supportMessages", {
+  id: int("id").autoincrement().primaryKey(),
+  chatId: int("chatId").notNull().references(() => supportChats.id, { onDelete: "cascade" }),
+  senderId: int("senderId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  senderRole: mysqlEnum("senderRole", ["user", "admin"]).notNull(),
+  message: text("message").notNull(),
+  isRead: int("isRead").default(0).notNull(), // 0 = не прочитано, 1 = прочитано
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type SupportMessage = typeof supportMessages.$inferSelect;
+export type InsertSupportMessage = typeof supportMessages.$inferInsert;

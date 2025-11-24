@@ -34,6 +34,12 @@ import {
   createErrorLog,
   getUserBalance,
   deductTokens,
+  getOrCreateUserSupportChat,
+  sendSupportMessage,
+  getSupportChatMessages,
+  getAllSupportChats,
+  markMessagesAsRead,
+  getUnreadMessagesCount,
 } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { transcribeAudio } from "./_core/voiceTranscription";
@@ -573,6 +579,105 @@ export const appRouter = router({
           throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
         }
         return await getErrorLogs(input.limit);
+      }),
+  }),
+
+  // Support chat endpoints
+  support: router({
+    // Получить или создать чат пользователя
+    getOrCreateChat: protectedProcedure
+      .query(async ({ ctx }) => {
+        const chat = await getOrCreateUserSupportChat(ctx.user.id);
+        
+        // Если чат только что создан, отправляем приветственное сообщение
+        const messages = await getSupportChatMessages(chat.id);
+        if (messages.length === 0) {
+          await sendSupportMessage(
+            chat.id,
+            1, // System user ID
+            "admin",
+            "Здравствуйте! Добро пожаловать в службу поддержки Business Process Builder. Чем мы можем вам помочь?"
+          );
+        }
+        
+        return chat;
+      }),
+
+    // Получить сообщения чата
+    getMessages: protectedProcedure
+      .input(z.object({ chatId: z.number() }))
+      .query(async ({ input }) => {
+        return await getSupportChatMessages(input.chatId);
+      }),
+
+    // Отправить сообщение
+    sendMessage: protectedProcedure
+      .input(z.object({
+        chatId: z.number(),
+        message: z.string(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        await sendSupportMessage(
+          input.chatId,
+          ctx.user.id,
+          "user",
+          input.message
+        );
+        return { success: true };
+      }),
+
+    // Отметить сообщения как прочитанные
+    markAsRead: protectedProcedure
+      .input(z.object({ chatId: z.number() }))
+      .mutation(async ({ input }) => {
+        await markMessagesAsRead(input.chatId, "user");
+        return { success: true };
+      }),
+
+    // Получить количество непрочитанных сообщений
+    getUnreadCount: protectedProcedure
+      .input(z.object({ chatId: z.number() }))
+      .query(async ({ input }) => {
+        return await getUnreadMessagesCount(input.chatId, "user");
+      }),
+
+    // Админ: получить все чаты
+    getAllChats: protectedProcedure
+      .query(async ({ ctx }) => {
+        if (ctx.user.role !== 'admin') {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+        }
+        return await getAllSupportChats();
+      }),
+
+    // Админ: отправить ответ
+    adminSendMessage: protectedProcedure
+      .input(z.object({
+        chatId: z.number(),
+        message: z.string(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== 'admin') {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+        }
+        await sendSupportMessage(
+          input.chatId,
+          ctx.user.id,
+          "admin",
+          input.message
+        );
+        return { success: true };
+      }),
+
+    // Админ: отметить сообщения как прочитанные
+    adminMarkAsRead: protectedProcedure
+      .input(z.object({ chatId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== 'admin') {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+        }
+        await markMessagesAsRead(input.chatId, "admin");
+        return { success: true };
       }),
   }),
 });

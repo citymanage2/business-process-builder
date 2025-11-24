@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { Users, DollarSign, AlertCircle, Loader2, Edit, Home } from "lucide-react";
+import { Users, DollarSign, AlertCircle, Loader2, Edit, Home, MessageCircle } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 
@@ -142,10 +142,18 @@ export default function Admin() {
 
         {/* Tabs */}
         <Tabs defaultValue="users" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 max-w-md">
-            <TabsTrigger value="users">Пользователи</TabsTrigger>
-            <TabsTrigger value="logs">Логи ошибок</TabsTrigger>
-          </TabsList>
+          <div className="flex items-center justify-between mb-6">
+            <TabsList className="grid w-full grid-cols-2 max-w-md">
+              <TabsTrigger value="users">Пользователи</TabsTrigger>
+              <TabsTrigger value="logs">Логи ошибок</TabsTrigger>
+            </TabsList>
+            <Link href="/admin/support">
+              <Button variant="outline" className="ml-4">
+                <MessageCircle className="w-4 h-4 mr-2" />
+                Чаты поддержки
+              </Button>
+            </Link>
+          </div>
 
           {/* Таблица пользователей */}
           <TabsContent value="users" className="mt-6">

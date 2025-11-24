@@ -8,7 +8,9 @@ import {
   InsertRecommendation, recommendations,
   InsertComment, comments,
   InsertDocument, documents,
-  InsertErrorLog, errorLogs
+  InsertErrorLog, errorLogs,
+  InsertSupportChat, supportChats,
+  InsertSupportMessage, supportMessages
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -405,4 +407,180 @@ export async function deductTokens(userId: number, amount: number): Promise<bool
     console.error("[Database] Failed to deduct tokens:", error);
     return false;
   }
+}
+
+// ==================== Support Chat Functions ====================
+
+/**
+ * Создать новый чат поддержки для пользователя
+ */
+export async function createSupportChat(userId: number) {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  const result = await db.insert(supportChats).values({
+    userId,
+    status: "open",
+    lastMessageAt: new Date(),
+  });
+
+  return result[0].insertId;
+}
+
+/**
+ * Получить чат поддержки пользователя (создать если не существует)
+ */
+export async function getOrCreateUserSupportChat(userId: number) {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  // Проверяем существующий открытый чат
+  const existingChats = await db
+    .select()
+    .from(supportChats)
+    .where(and(eq(supportChats.userId, userId), eq(supportChats.status, "open")))
+    .limit(1);
+
+  if (existingChats.length > 0) {
+    return existingChats[0];
+  }
+
+  // Создаем новый чат
+  const chatId = await createSupportChat(userId);
+  
+  // Получаем созданный чат
+  const newChat = await db
+    .select()
+    .from(supportChats)
+    .where(eq(supportChats.id, chatId))
+    .limit(1);
+
+  return newChat[0];
+}
+
+/**
+ * Отправить сообщение в чат поддержки
+ */
+export async function sendSupportMessage(
+  chatId: number,
+  senderId: number,
+  senderRole: "user" | "admin",
+  message: string
+) {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  // Вставляем сообщение
+  await db.insert(supportMessages).values({
+    chatId,
+    senderId,
+    senderRole,
+    message,
+    isRead: 0,
+  });
+
+  // Обновляем время последнего сообщения в чате
+  await db
+    .update(supportChats)
+    .set({ lastMessageAt: new Date() })
+    .where(eq(supportChats.id, chatId));
+}
+
+/**
+ * Получить все сообщения чата
+ */
+export async function getSupportChatMessages(chatId: number) {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  return await db
+    .select()
+    .from(supportMessages)
+    .where(eq(supportMessages.chatId, chatId))
+    .orderBy(supportMessages.createdAt);
+}
+
+/**
+ * Получить все чаты (для админа)
+ */
+export async function getAllSupportChats() {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  // Получаем чаты с информацией о пользователях
+  const chats = await db
+    .select({
+      id: supportChats.id,
+      userId: supportChats.userId,
+      status: supportChats.status,
+      lastMessageAt: supportChats.lastMessageAt,
+      createdAt: supportChats.createdAt,
+      userName: users.name,
+      userEmail: users.email,
+    })
+    .from(supportChats)
+    .leftJoin(users, eq(supportChats.userId, users.id))
+    .orderBy(supportChats.lastMessageAt);
+
+  return chats;
+}
+
+/**
+ * Отметить сообщения как прочитанные
+ */
+export async function markMessagesAsRead(chatId: number, role: "user" | "admin") {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  // Отмечаем непрочитанные сообщения от противоположной роли
+  const oppositeRole = role === "user" ? "admin" : "user";
+  
+  await db
+    .update(supportMessages)
+    .set({ isRead: 1 })
+    .where(
+      and(
+        eq(supportMessages.chatId, chatId),
+        eq(supportMessages.senderRole, oppositeRole),
+        eq(supportMessages.isRead, 0)
+      )
+    );
+}
+
+/**
+ * Получить количество непрочитанных сообщений для роли
+ */
+export async function getUnreadMessagesCount(chatId: number, role: "user" | "admin") {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  // Считаем непрочитанные сообщения от противоположной роли
+  const oppositeRole = role === "user" ? "admin" : "user";
+  
+  const result = await db
+    .select()
+    .from(supportMessages)
+    .where(
+      and(
+        eq(supportMessages.chatId, chatId),
+        eq(supportMessages.senderRole, oppositeRole),
+        eq(supportMessages.isRead, 0)
+      )
+    );
+
+  return result.length;
 }

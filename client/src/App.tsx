@@ -14,6 +14,8 @@ import ProcessView from "./pages/ProcessView";
 import Profile from "./pages/Profile";
 import CompanyProcesses from "./pages/CompanyProcesses";
 import Admin from "./pages/Admin";
+import AdminSupport from "./pages/AdminSupport";
+import SupportChat from "./components/SupportChat";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -29,6 +31,7 @@ function Router() {
       <Route path="/profile" component={Profile} />
       <Route path="/company/:id/processes" component={CompanyProcesses} />
       <Route path="/admin" component={Admin} />
+      <Route path="/admin/support" component={AdminSupport} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />
@@ -51,6 +54,7 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <Router />
+          <SupportChat />
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>
