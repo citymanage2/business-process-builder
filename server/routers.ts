@@ -28,6 +28,10 @@ import {
   deleteDocument,
   saveDraftInterview,
   getDraftInterviews,
+  getAllUsers,
+  updateUserBalance,
+  getErrorLogs,
+  createErrorLog,
 } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { transcribeAudio } from "./_core/voiceTranscription";
@@ -501,6 +505,47 @@ export const appRouter = router({
       .input(z.object({ companyId: z.number() }))
       .query(async ({ input }) => {
         return await getDraftInterviews(input.companyId);
+      }),
+  }),
+
+  // Admin router - только для администраторов
+  admin: router({
+    // Получить список всех пользователей
+    getAllUsers: protectedProcedure
+      .query(async ({ ctx }) => {
+        if (ctx.user.role !== 'admin') {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+        }
+        return await getAllUsers();
+      }),
+
+    // Обновить баланс пользователя
+    updateUserBalance: protectedProcedure
+      .input(z.object({
+        userId: z.number(),
+        newBalance: z.number().min(0),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== 'admin') {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+        }
+        const success = await updateUserBalance(input.userId, input.newBalance);
+        if (!success) {
+          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to update balance' });
+        }
+        return { success: true };
+      }),
+
+    // Получить логи ошибок
+    getErrorLogs: protectedProcedure
+      .input(z.object({
+        limit: z.number().optional().default(100),
+      }))
+      .query(async ({ ctx, input }) => {
+        if (ctx.user.role !== 'admin') {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+        }
+        return await getErrorLogs(input.limit);
       }),
   }),
 });

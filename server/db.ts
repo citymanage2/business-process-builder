@@ -7,7 +7,8 @@ import {
   InsertBusinessProcess, businessProcesses,
   InsertRecommendation, recommendations,
   InsertComment, comments,
-  InsertDocument, documents
+  InsertDocument, documents,
+  InsertErrorLog, errorLogs
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -286,4 +287,70 @@ export async function getDraftInterviews(companyId: number) {
       eq(interviews.status, "draft")
     ));
   return result;
+}
+
+// ==================== Admin Functions ====================
+
+export async function getAllUsers() {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get users: database not available");
+    return [];
+  }
+
+  try {
+    const result = await db.select().from(users);
+    return result;
+  } catch (error) {
+    console.error("[Database] Failed to get all users:", error);
+    return [];
+  }
+}
+
+export async function updateUserBalance(userId: number, newBalance: number) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot update balance: database not available");
+    return false;
+  }
+
+  try {
+    await db.update(users)
+      .set({ tokenBalance: newBalance, updatedAt: new Date() })
+      .where(eq(users.id, userId));
+    return true;
+  } catch (error) {
+    console.error("[Database] Failed to update user balance:", error);
+    return false;
+  }
+}
+
+export async function getErrorLogs(limit: number = 100) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get error logs: database not available");
+    return [];
+  }
+
+  try {
+    const result = await db.select().from(errorLogs).limit(limit).orderBy(errorLogs.createdAt);
+    return result;
+  } catch (error) {
+    console.error("[Database] Failed to get error logs:", error);
+    return [];
+  }
+}
+
+export async function createErrorLog(log: InsertErrorLog) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot create error log: database not available");
+    return;
+  }
+
+  try {
+    await db.insert(errorLogs).values(log);
+  } catch (error) {
+    console.error("[Database] Failed to create error log:", error);
+  }
 }
