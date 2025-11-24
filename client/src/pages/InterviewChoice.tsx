@@ -2,7 +2,8 @@ import { useRoute, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
-import { FileText, Mic, CheckCircle2, Clock, Loader2, ArrowRight } from "lucide-react";
+import { FileText, Mic, CheckCircle2, Clock, Loader2, ArrowRight, Coins } from "lucide-react";
+import { OPERATION_COSTS } from "@shared/costs";
 import { useEffect } from "react";
 
 export default function InterviewChoice() {
@@ -51,9 +52,15 @@ export default function InterviewChoice() {
         <h1 className="text-3xl font-bold mb-2">
           Выберите способ интервью
         </h1>
-        <p className="text-muted-foreground">
+        <p className="text-muted-foreground mb-3">
           Компания: {company.name}
         </p>
+        <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg">
+          <Coins className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+          <span className="text-sm font-medium text-amber-900 dark:text-amber-100">
+            Стоимость генерации процесса: {OPERATION_COSTS.GENERATE_PROCESS} токенов
+          </span>
+        </div>
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">

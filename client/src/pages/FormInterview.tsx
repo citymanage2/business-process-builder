@@ -50,11 +50,28 @@ export default function FormInterview() {
 
   const generateProcessMutation = trpc.processes.generate.useMutation({
     onSuccess: (data) => {
-      toast.success("Процесс сгенерирован!");
+      if (data.tokensDeducted && data.newBalance !== undefined) {
+        toast.success(
+          `Процесс сгенерирован! Списано ${data.tokensDeducted} токенов. Осталось: ${data.newBalance}`,
+          { duration: 5000 }
+        );
+      } else {
+        toast.success("Процесс сгенерирован!");
+      }
       setLocation(`/process/${data.id}`);
     },
     onError: (error) => {
-      toast.error(`Ошибка: ${error.message}`);
+      if (error.data?.code === 'PRECONDITION_FAILED') {
+        toast.error(error.message, {
+          duration: 7000,
+          action: {
+            label: 'Пополнить',
+            onClick: () => setLocation('/profile')
+          }
+        });
+      } else {
+        toast.error(`Ошибка: ${error.message}`);
+      }
     },
   });
 

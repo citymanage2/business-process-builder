@@ -354,3 +354,55 @@ export async function createErrorLog(log: InsertErrorLog) {
     console.error("[Database] Failed to create error log:", error);
   }
 }
+
+// Token balance operations
+export async function getUserBalance(userId: number): Promise<number> {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get user balance: database not available");
+    return 0;
+  }
+
+  try {
+    const result = await db.select({ tokenBalance: users.tokenBalance })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    
+    return result.length > 0 ? (result[0].tokenBalance || 0) : 0;
+  } catch (error) {
+    console.error("[Database] Failed to get user balance:", error);
+    return 0;
+  }
+}
+
+export async function deductTokens(userId: number, amount: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot deduct tokens: database not available");
+    return false;
+  }
+
+  try {
+    // Получаем текущий баланс
+    const currentBalance = await getUserBalance(userId);
+    
+    // Проверяем достаточность средств
+    if (currentBalance < amount) {
+      console.warn(`[Database] Insufficient balance for user ${userId}: ${currentBalance} < ${amount}`);
+      return false;
+    }
+
+    // Списываем токены
+    const newBalance = currentBalance - amount;
+    await db.update(users)
+      .set({ tokenBalance: newBalance, updatedAt: new Date() })
+      .where(eq(users.id, userId));
+    
+    console.log(`[Database] Deducted ${amount} tokens from user ${userId}. New balance: ${newBalance}`);
+    return true;
+  } catch (error) {
+    console.error("[Database] Failed to deduct tokens:", error);
+    return false;
+  }
+}

@@ -32,11 +32,14 @@ import {
   updateUserBalance,
   getErrorLogs,
   createErrorLog,
+  getUserBalance,
+  deductTokens,
 } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { transcribeAudio } from "./_core/voiceTranscription";
 import { storagePut } from "./storage";
 import { buildProcessPrompt, buildQuestionsPrompt, buildRecommendationsPrompt } from "./prompts";
+import { OPERATION_COSTS } from "@shared/costs";
 
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -178,12 +181,26 @@ export const appRouter = router({
         companyId: z.number(),
         interviewId: z.number(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        // Проверяем баланс пользователя перед генерацией
+        const currentBalance = await getUserBalance(ctx.user.id);
+        const cost = OPERATION_COSTS.GENERATE_PROCESS;
+
+        if (currentBalance < cost) {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: `Недостаточно токенов для генерации процесса. Требуется: ${cost}, доступно: ${currentBalance}`,
+          });
+        }
+
         const company = await getCompanyById(input.companyId);
         const interview = await getInterviewById(input.interviewId);
 
         if (!company || !interview) {
-          throw new Error("Company or interview not found");
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Компания или интервью не найдены',
+          });
         }
 
         // Формируем контекст компании
@@ -277,7 +294,17 @@ export const appRouter = router({
           status: "draft",
         });
 
-        return { id, process: processData };
+        // Списываем токены после успешной генерации
+        const deducted = await deductTokens(ctx.user.id, cost);
+        if (!deducted) {
+          console.error(`[Process Generation] Failed to deduct tokens for user ${ctx.user.id}`);
+          // Не бросаем ошибку, так как процесс уже создан
+        }
+
+        const newBalance = await getUserBalance(ctx.user.id);
+        console.log(`[Process Generation] Process created successfully. User ${ctx.user.id} new balance: ${newBalance}`);
+
+        return { id, process: processData, tokensDeducted: cost, newBalance };
       }),
     list: protectedProcedure
       .input(z.object({ companyId: z.number() }))

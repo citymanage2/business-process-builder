@@ -1,0 +1,9 @@
+{
+  "query": "UPDATE users SET tokenBalance = 50 WHERE openId = '5ov7wgb8bxzBkuTXBXC8rN'",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2caBidRtXS3CBxe.9f9b2212b9bd --database AtkYmgPLTEDMC5w2gAV6C3 --execute UPDATE users SET tokenBalance = 50 WHERE openId = '5ov7wgb8bxzBkuTXBXC8rN'",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 55
+}

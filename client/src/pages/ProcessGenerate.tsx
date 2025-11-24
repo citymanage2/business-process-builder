@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
-import { Loader2, Sparkles } from "lucide-react";
+import { Loader2, Sparkles, Coins } from "lucide-react";
 import { toast } from "sonner";
 
 export default function ProcessGenerate() {
@@ -14,11 +14,29 @@ export default function ProcessGenerate() {
 
   const generateMutation = trpc.processes.generate.useMutation({
     onSuccess: (data) => {
-      toast.success("Бизнес-процесс создан!");
+      if (data.tokensDeducted && data.newBalance !== undefined) {
+        toast.success(
+          `Бизнес-процесс создан! Списано ${data.tokensDeducted} токенов. Осталось: ${data.newBalance}`,
+          { duration: 5000 }
+        );
+      } else {
+        toast.success("Бизнес-процесс создан!");
+      }
       setLocation(`/process/${data.id}`);
     },
     onError: (error) => {
-      toast.error(`Ошибка: ${error.message}`);
+      // Проверяем код ошибки недостаточного баланса
+      if (error.data?.code === 'PRECONDITION_FAILED') {
+        toast.error(error.message, {
+          duration: 7000,
+          action: {
+            label: 'Пополнить',
+            onClick: () => setLocation('/profile')
+          }
+        });
+      } else {
+        toast.error(`Ошибка: ${error.message}`);
+      }
     },
   });
 
