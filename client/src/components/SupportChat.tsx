@@ -21,8 +21,8 @@ export default function SupportChat() {
   const [isOpen, setIsOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [chatId, setChatId] = useState<number | null>(null);
-  const [suggestions, setSuggestions] = useState<Array<{ id: number; question: string; answer: string }>>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const hasMarkedAsRead = useRef(false);
 
   // Получить или создать чат
   const { data: chat } = trpc.support.getOrCreateChat.useQuery(undefined, {
@@ -46,7 +46,7 @@ export default function SupportChat() {
   const sendMessageMutation = trpc.support.sendMessage.useMutation({
     onSuccess: () => {
       setMessage("");
-      setSuggestions([]);
+      setSearchQuery("");
       refetchMessages();
     },
   });
@@ -68,9 +68,14 @@ export default function SupportChat() {
 
   // Отметить сообщения как прочитанные при открытии
   useEffect(() => {
-    if (isOpen && chatId) {
+    if (isOpen && chatId && !hasMarkedAsRead.current) {
+      hasMarkedAsRead.current = true;
       markAsReadMutation.mutate({ chatId });
     }
+    if (!isOpen) {
+      hasMarkedAsRead.current = false;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, chatId]);
 
   const handleSend = () => {
@@ -101,14 +106,11 @@ export default function SupportChat() {
     }
   }, [message]);
 
-  // Обновить подсказки при получении результатов
-  useEffect(() => {
-    setSuggestions(faqResults);
-  }, [faqResults]);
+
 
   const handleSuggestionClick = (answer: string) => {
     setMessage(answer);
-    setSuggestions([]);
+    setSearchQuery("");
   };
 
   if (!isAuthenticated) return null;
@@ -169,11 +171,11 @@ export default function SupportChat() {
           </div>
 
           {/* FAQ Подсказки */}
-          {suggestions.length > 0 && (
+          {faqResults.length > 0 && (
             <div className="px-4 py-2 border-t bg-muted/30 max-h-32 overflow-y-auto">
               <p className="text-xs text-muted-foreground mb-2">Возможно, это поможет:</p>
               <div className="space-y-1">
-                {suggestions.map((suggestion) => (
+                {faqResults.map((suggestion: { id: number; question: string; answer: string }) => (
                   <button
                     key={suggestion.id}
                     onClick={() => handleSuggestionClick(suggestion.question)}
