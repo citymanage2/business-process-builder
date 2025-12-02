@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { MessageCircle, X, Send } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useSocket } from "@/hooks/useSocket";
 
 interface Message {
   id: number;
@@ -29,10 +30,13 @@ export default function SupportChat() {
     enabled: isAuthenticated && isOpen,
   });
 
+  // WebSocket для real-time обновлений
+  const { isConnected, joinChat, leaveChat, onNewMessage, offNewMessage } = useSocket();
+
   // Получить сообщения
   const { data: messages = [], refetch: refetchMessages } = trpc.support.getMessages.useQuery(
     { chatId: chatId! },
-    { enabled: !!chatId, refetchInterval: 3000 } // Polling каждые 3 секунды
+    { enabled: !!chatId } // Убрали polling - используем WebSocket
   );
 
   // Поиск FAQ по ключевым словам
@@ -65,6 +69,25 @@ export default function SupportChat() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Подписаться на WebSocket события при открытии чата
+  useEffect(() => {
+    if (chatId && isOpen) {
+      // Присоединиться к комнате чата
+      joinChat(chatId);
+
+      // Подписаться на новые сообщения
+      onNewMessage(() => {
+        refetchMessages();
+      });
+
+      return () => {
+        leaveChat(chatId);
+        offNewMessage();
+      };
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatId, isOpen]);
 
   // Отметить сообщения как прочитанные при открытии
   useEffect(() => {

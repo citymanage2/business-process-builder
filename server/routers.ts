@@ -623,12 +623,18 @@ export const appRouter = router({
         message: z.string(),
       }))
       .mutation(async ({ ctx, input }) => {
-        await sendSupportMessage(
+        const message = await sendSupportMessage(
           input.chatId,
           ctx.user.id,
           "user",
           input.message
         );
+        
+        // Отправить Socket.IO событие о новом сообщении
+        const io = ctx.req.app?.locals?.io;
+        if (io) {
+          io.to(`chat_${input.chatId}`).emit("new_message", message);
+        }
         
         // Отправить уведомление администратору
         const { notifyOwner } = await import("./_core/notification");

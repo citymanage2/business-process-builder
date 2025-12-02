@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
 import { MessageCircle, Send, Loader2, AlertCircle, Home } from "lucide-react";
 import { Link } from "wouter";
+import { useSocket } from "@/hooks/useSocket";
 
 interface Message {
   id: number;
@@ -34,15 +35,16 @@ export default function AdminSupport() {
   const [message, setMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // WebSocket для real-time обновлений
+  const { isConnected, joinChat, leaveChat, onNewMessage, offNewMessage } = useSocket();
+
   // Получить все чаты
-  const { data: chats = [], refetch: refetchChats } = trpc.support.getAllChats.useQuery(undefined, {
-    refetchInterval: 5000, // Обновление каждые 5 секунд
-  });
+  const { data: chats = [], refetch: refetchChats } = trpc.support.getAllChats.useQuery(undefined);
 
   // Получить сообщения выбранного чата
   const { data: messages = [], refetch: refetchMessages } = trpc.support.getMessages.useQuery(
     { chatId: selectedChatId! },
-    { enabled: !!selectedChatId, refetchInterval: 3000 }
+    { enabled: !!selectedChatId } // Убрали polling - используем WebSocket
   );
 
   // Отправить сообщение
@@ -66,11 +68,27 @@ export default function AdminSupport() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Отметить сообщения как прочитанные при выборе чата
+  // Подписаться на WebSocket события при выборе чата
   useEffect(() => {
     if (selectedChatId) {
+      // Присоединиться к комнате чата
+      joinChat(selectedChatId);
+
+      // Подписаться на новые сообщения
+      onNewMessage(() => {
+        refetchMessages();
+        refetchChats();
+      });
+
+      // Отметить как прочитанное
       markAsReadMutation.mutate({ chatId: selectedChatId });
+
+      return () => {
+        leaveChat(selectedChatId);
+        offNewMessage();
+      };
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedChatId]);
 
   // Проверка прав доступа

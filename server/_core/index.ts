@@ -7,6 +7,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { setupSocket } from "./socket";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -43,6 +44,12 @@ async function startServer() {
       createContext,
     })
   );
+  // Setup Socket.IO
+  const io = setupSocket(server);
+  
+  // Make io available in app locals for use in routers
+  app.locals.io = io;
+
   // development mode uses Vite, production mode uses static files
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);
