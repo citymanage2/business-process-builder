@@ -1,5 +1,6 @@
-import { eq, like, or, and } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { eq, like, and, or } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import { 
   InsertUser, users,
   InsertCompany, companies,
@@ -22,7 +23,8 @@ let _db: ReturnType<typeof drizzle> | null = null;
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      const client = postgres(process.env.DATABASE_URL);
+      _db = drizzle(client);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
@@ -50,8 +52,8 @@ export async function createUser(data: { email: string; name?: string; provider?
     values.role = 'admin';
   }
 
-  const result = await db.insert(users).values(values);
-  const userId = result[0].insertId;
+  const result = await db.insert(users).values(values).returning({ id: users.id });
+  const userId = result[0].id;
   
   const user = await getUserById(userId);
   if (!user) throw new Error("Failed to create user");
@@ -103,8 +105,8 @@ export async function getUserByOpenId(openId: string) {
 export async function createCompany(company: InsertCompany) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(companies).values(company);
-  return result[0].insertId;
+  const result = await db.insert(companies).values(company).returning({ id: companies.id });
+  return result[0].id;
 }
 
 export async function getUserCompanies(userId: number) {
@@ -136,8 +138,8 @@ export async function deleteCompany(id: number) {
 export async function createInterview(interview: InsertInterview) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(interviews).values(interview);
-  return result[0].insertId;
+  const result = await db.insert(interviews).values(interview).returning({ id: interviews.id });
+  return result[0].id;
 }
 
 export async function getInterviewById(id: number) {
@@ -157,8 +159,8 @@ export async function updateInterview(id: number, data: Partial<InsertInterview>
 export async function createBusinessProcess(process: InsertBusinessProcess) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(businessProcesses).values(process);
-  return result[0].insertId;
+  const result = await db.insert(businessProcesses).values(process).returning({ id: businessProcesses.id });
+  return result[0].id;
 }
 
 export async function getCompanyProcesses(companyId: number) {
@@ -195,8 +197,8 @@ export async function deleteBusinessProcess(id: number) {
 export async function createRecommendation(recommendation: InsertRecommendation) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(recommendations).values(recommendation);
-  return result[0].insertId;
+  const result = await db.insert(recommendations).values(recommendation).returning({ id: recommendations.id });
+  return result[0].id;
 }
 
 export async function getProcessRecommendations(businessProcessId: number) {
@@ -209,8 +211,8 @@ export async function getProcessRecommendations(businessProcessId: number) {
 export async function createComment(comment: InsertComment) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(comments).values(comment);
-  return result[0].insertId;
+  const result = await db.insert(comments).values(comment).returning({ id: comments.id });
+  return result[0].id;
 }
 
 export async function getProcessComments(businessProcessId: number) {
@@ -272,8 +274,8 @@ export async function saveDraftInterview(interview: InsertInterview) {
     const result = await db.insert(interviews).values({
       ...interview,
       status: "draft",
-    });
-    return result[0]?.insertId;
+    }).returning({ id: interviews.id });
+    return result[0]?.id;
   }
 }
 
@@ -423,9 +425,9 @@ export async function createSupportChat(userId: number) {
     userId,
     status: "open",
     lastMessageAt: new Date(),
-  });
+  }).returning({ id: supportChats.id });
 
-  return result[0].insertId;
+  return result[0].id;
 }
 
 /**
@@ -630,8 +632,8 @@ export async function createFaqArticle(article: InsertFaqArticle): Promise<numbe
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   
-  const result = await db.insert(faqArticles).values(article);
-  return result[0].insertId;
+  const result = await db.insert(faqArticles).values(article).returning({ id: faqArticles.id });
+  return result[0].id;
 }
 
 export async function updateFaqArticle(id: number, article: Partial<InsertFaqArticle>): Promise<void> {
@@ -663,8 +665,8 @@ export async function createVerificationToken(data: InsertVerificationToken): Pr
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  const result = await db.insert(verificationTokens).values(data);
-  const insertedId = Number(result[0].insertId);
+  const result = await db.insert(verificationTokens).values(data).returning({ id: verificationTokens.id });
+  const insertedId = result[0].id;
 
   const token = await db.select().from(verificationTokens).where(eq(verificationTokens.id, insertedId)).limit(1);
   return token[0];
