@@ -2,12 +2,16 @@ import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
+import session from "express-session";
+import passport from "passport";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { setupSocket } from "./socket";
+import { configurePassport } from "./auth";
+import authRoutes from "./authRoutes";
+import { ENV } from "./env";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -31,17 +35,38 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
+  
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
-  // OAuth callback under /api/oauth/callback
-  registerOAuthRoutes(app);
+  
+  // Session configuration
+  app.use(
+    session({
+      secret: ENV.cookieSecret,
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        secure: ENV.isProduction,
+        httpOnly: true,
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      },
+    })
+  );
+  
+  // Initialize Passport
+  configurePassport();
+  app.use(passport.initialize());
+  app.use(passport.session());
+  
+  // Auth routes under /api/auth
+  app.use('/api/auth', authRoutes);
   // tRPC API
   app.use(
     "/api/trpc",
     createExpressMiddleware({
       router: appRouter,
-      createContext,
+      createContext: (opts) => createContext(opts),
     })
   );
   // Setup Socket.IO

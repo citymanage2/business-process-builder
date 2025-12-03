@@ -1,6 +1,6 @@
 import { Server as HTTPServer } from "http";
 import { Server as IOServer } from "socket.io";
-import { sdk } from "./sdk";
+import { getUserById } from "../db";
 
 export function setupSocket(httpServer: HTTPServer) {
   const io = new IOServer(httpServer, {
@@ -16,15 +16,16 @@ export function setupSocket(httpServer: HTTPServer) {
   // Middleware для аутентификации
   io.use(async (socket, next) => {
     try {
-      // Создаем mock request объект для sdk.authenticateRequest
-      const mockReq = {
-        headers: socket.handshake.headers,
-        cookies: socket.handshake.headers.cookie,
-      } as any;
+      // Получаем userId из сессии
+      const userId = socket.handshake.auth.userId;
+      
+      if (!userId) {
+        return next(new Error("Authentication error: No user ID"));
+      }
 
-      const user = await sdk.authenticateRequest(mockReq);
+      const user = await getUserById(userId);
       if (!user) {
-        return next(new Error("Authentication error: No user found"));
+        return next(new Error("Authentication error: User not found"));
       }
 
       // Сохраняем данные пользователя в socket
@@ -36,7 +37,7 @@ export function setupSocket(httpServer: HTTPServer) {
   });
 
   io.on("connection", (socket) => {
-    console.log(`[Socket.IO] User connected: ${socket.data.user?.name || socket.data.user?.openId}`);
+    console.log(`[Socket.IO] User connected: ${socket.data.user?.name || socket.data.user?.email}`);
 
     // Присоединиться к комнате чата
     socket.on("join_chat", (chatId: number) => {

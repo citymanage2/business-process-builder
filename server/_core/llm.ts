@@ -1,4 +1,11 @@
-import { ENV } from "./env";
+/**
+ * LLM Integration - Claude API
+ * 
+ * This module provides a unified interface for AI completions using Claude API.
+ * It maintains compatibility with the original Manus LLM interface while using Anthropic's Claude.
+ */
+
+import { invokeClaude, invokeClaudeJSON, ClaudeMessage } from './claude';
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -19,7 +26,7 @@ export type FileContent = {
   type: "file_url";
   file_url: {
     url: string;
-    mime_type?: "audio/mpeg" | "audio/wav" | "application/pdf" | "audio/mp4" | "video/mp4" ;
+    mime_type?: "audio/mpeg" | "audio/wav" | "application/pdf" | "audio/mp4" | "video/mp4";
   };
 };
 
@@ -99,234 +106,148 @@ export type InvokeResult = {
 
 export type JsonSchema = {
   name: string;
-  schema: Record<string, unknown>;
   strict?: boolean;
+  schema: Record<string, unknown>;
 };
 
-export type OutputSchema = JsonSchema;
-
-export type ResponseFormat =
-  | { type: "text" }
-  | { type: "json_object" }
-  | { type: "json_schema"; json_schema: JsonSchema };
-
-const ensureArray = (
-  value: MessageContent | MessageContent[]
-): MessageContent[] => (Array.isArray(value) ? value : [value]);
-
-const normalizeContentPart = (
-  part: MessageContent
-): TextContent | ImageContent | FileContent => {
-  if (typeof part === "string") {
-    return { type: "text", text: part };
-  }
-
-  if (part.type === "text") {
-    return part;
-  }
-
-  if (part.type === "image_url") {
-    return part;
-  }
-
-  if (part.type === "file_url") {
-    return part;
-  }
-
-  throw new Error("Unsupported message content part");
+export type OutputSchema = {
+  type: "json_schema";
+  json_schema: JsonSchema;
 };
 
-const normalizeMessage = (message: Message) => {
-  const { role, name, tool_call_id } = message;
+export type ResponseFormat = {
+  type: "json_object" | "json_schema";
+  json_schema?: JsonSchema;
+};
 
-  if (role === "tool" || role === "function") {
-    const content = ensureArray(message.content)
-      .map(part => (typeof part === "string" ? part : JSON.stringify(part)))
-      .join("\n");
+/**
+ * Convert Message[] to Claude format
+ */
+function convertToClaudeMessages(messages: Message[]): { system?: string; messages: ClaudeMessage[] } {
+  const systemMessages: string[] = [];
+  const claudeMessages: ClaudeMessage[] = [];
 
-    return {
-      role,
-      name,
-      tool_call_id,
-      content,
-    };
-  }
+  for (const msg of messages) {
+    // Extract text content
+    let textContent: string;
+    if (typeof msg.content === 'string') {
+      textContent = msg.content;
+    } else if (Array.isArray(msg.content)) {
+      // Find text content in array
+      const textItem = msg.content.find(item => 
+        typeof item === 'object' && 'type' in item && item.type === 'text'
+      ) as TextContent | undefined;
+      textContent = textItem?.text || '';
+    } else if ('type' in msg.content && msg.content.type === 'text') {
+      textContent = msg.content.text;
+    } else {
+      textContent = '';
+    }
 
-  const contentParts = ensureArray(message.content).map(normalizeContentPart);
-
-  // If there's only text content, collapse to a single string for compatibility
-  if (contentParts.length === 1 && contentParts[0].type === "text") {
-    return {
-      role,
-      name,
-      content: contentParts[0].text,
-    };
+    // Separate system messages
+    if (msg.role === 'system') {
+      systemMessages.push(textContent);
+    } else if (msg.role === 'user' || msg.role === 'assistant') {
+      claudeMessages.push({
+        role: msg.role,
+        content: textContent,
+      });
+    }
   }
 
   return {
-    role,
-    name,
-    content: contentParts,
+    system: systemMessages.length > 0 ? systemMessages.join('\n\n') : undefined,
+    messages: claudeMessages,
   };
-};
+}
 
-const normalizeToolChoice = (
-  toolChoice: ToolChoice | undefined,
-  tools: Tool[] | undefined
-): "none" | "auto" | ToolChoiceExplicit | undefined => {
-  if (!toolChoice) return undefined;
-
-  if (toolChoice === "none" || toolChoice === "auto") {
-    return toolChoice;
-  }
-
-  if (toolChoice === "required") {
-    if (!tools || tools.length === 0) {
-      throw new Error(
-        "tool_choice 'required' was provided but no tools were configured"
-      );
-    }
-
-    if (tools.length > 1) {
-      throw new Error(
-        "tool_choice 'required' needs a single tool or specify the tool name explicitly"
-      );
-    }
-
-    return {
-      type: "function",
-      function: { name: tools[0].function.name },
-    };
-  }
-
-  if ("name" in toolChoice) {
-    return {
-      type: "function",
-      function: { name: toolChoice.name },
-    };
-  }
-
-  return toolChoice;
-};
-
-const resolveApiUrl = () =>
-  ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
-    ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`
-    : "https://forge.manus.im/v1/chat/completions";
-
-const assertApiKey = () => {
-  if (!ENV.forgeApiKey) {
-    throw new Error("OPENAI_API_KEY is not configured");
-  }
-};
-
-const normalizeResponseFormat = ({
-  responseFormat,
-  response_format,
-  outputSchema,
-  output_schema,
-}: {
-  responseFormat?: ResponseFormat;
-  response_format?: ResponseFormat;
-  outputSchema?: OutputSchema;
-  output_schema?: OutputSchema;
-}):
-  | { type: "json_schema"; json_schema: JsonSchema }
-  | { type: "text" }
-  | { type: "json_object" }
-  | undefined => {
-  const explicitFormat = responseFormat || response_format;
-  if (explicitFormat) {
-    if (
-      explicitFormat.type === "json_schema" &&
-      !explicitFormat.json_schema?.schema
-    ) {
-      throw new Error(
-        "responseFormat json_schema requires a defined schema object"
-      );
-    }
-    return explicitFormat;
-  }
-
-  const schema = outputSchema || output_schema;
-  if (!schema) return undefined;
-
-  if (!schema.name || !schema.schema) {
-    throw new Error("outputSchema requires both name and schema");
-  }
-
-  return {
-    type: "json_schema",
-    json_schema: {
-      name: schema.name,
-      schema: schema.schema,
-      ...(typeof schema.strict === "boolean" ? { strict: schema.strict } : {}),
-    },
-  };
-};
-
+/**
+ * Main LLM invocation function using Claude API
+ */
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
-  assertApiKey();
-
   const {
     messages,
-    tools,
-    toolChoice,
-    tool_choice,
-    outputSchema,
-    output_schema,
+    maxTokens,
+    max_tokens,
     responseFormat,
     response_format,
+    outputSchema,
+    output_schema,
   } = params;
 
-  const payload: Record<string, unknown> = {
-    model: "gemini-2.5-flash",
-    messages: messages.map(normalizeMessage),
-  };
+  // Convert messages to Claude format
+  const { system, messages: claudeMessages } = convertToClaudeMessages(messages);
 
-  if (tools && tools.length > 0) {
-    payload.tools = tools;
+  // Determine max tokens
+  const maxTokensValue = maxTokens || max_tokens || 4096;
+
+  // Check if JSON output is requested
+  const jsonFormat = responseFormat || response_format || outputSchema || output_schema;
+
+  try {
+    let content: string;
+
+    if (jsonFormat) {
+      // Use JSON mode
+      const jsonResult = await invokeClaudeJSON({
+        messages: claudeMessages,
+        systemPrompt: system,
+        maxTokens: maxTokensValue,
+      });
+      content = JSON.stringify(jsonResult);
+    } else {
+      // Regular text completion
+      content = await invokeClaude({
+        messages: claudeMessages,
+        systemPrompt: system,
+        maxTokens: maxTokensValue,
+      });
+    }
+
+    // Return in OpenAI-compatible format
+    return {
+      id: `claude-${Date.now()}`,
+      created: Math.floor(Date.now() / 1000),
+      model: 'claude-3-5-sonnet-20241022',
+      choices: [
+        {
+          index: 0,
+          message: {
+            role: 'assistant',
+            content,
+          },
+          finish_reason: 'stop',
+        },
+      ],
+      usage: {
+        prompt_tokens: estimateTokens(claudeMessages.map(m => m.content).join(' ')),
+        completion_tokens: estimateTokens(content),
+        total_tokens: estimateTokens(claudeMessages.map(m => m.content).join(' ') + content),
+      },
+    };
+  } catch (error) {
+    console.error('[LLM] Error:', error);
+    throw error;
   }
+}
 
-  const normalizedToolChoice = normalizeToolChoice(
-    toolChoice || tool_choice,
-    tools
-  );
-  if (normalizedToolChoice) {
-    payload.tool_choice = normalizedToolChoice;
+/**
+ * Estimate token count (approximate)
+ */
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4);
+}
+
+/**
+ * Validate API key
+ */
+function assertApiKey(): void {
+  if (!process.env.CLAUDE_API_KEY) {
+    throw new Error('CLAUDE_API_KEY environment variable is required');
   }
+}
 
-  payload.max_tokens = 32768
-  payload.thinking = {
-    "budget_tokens": 128
-  }
-
-  const normalizedResponseFormat = normalizeResponseFormat({
-    responseFormat,
-    response_format,
-    outputSchema,
-    output_schema,
-  });
-
-  if (normalizedResponseFormat) {
-    payload.response_format = normalizedResponseFormat;
-  }
-
-  const response = await fetch(resolveApiUrl(), {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${ENV.forgeApiKey}`,
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(
-      `LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`
-    );
-  }
-
-  return (await response.json()) as InvokeResult;
+// Validate on module load in production
+if (process.env.NODE_ENV === 'production') {
+  assertApiKey();
 }

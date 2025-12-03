@@ -1,16 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 export function useSocket() {
+  const { user } = useAuth();
   const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
+    if (!user) return;
+
     // Создаем Socket.IO соединение
     const socket = io({
       path: "/socket.io",
       withCredentials: true,
       autoConnect: true,
+      auth: {
+        userId: user.id,
+      },
     });
 
     socketRef.current = socket;
@@ -33,7 +40,7 @@ export function useSocket() {
     return () => {
       socket.disconnect();
     };
-  }, []);
+  }, [user]);
 
   const joinChat = (chatId: number) => {
     if (socketRef.current) {

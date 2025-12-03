@@ -11,13 +11,13 @@ export const users = mysqlTable("users", {
    * Use this for relations between tables.
    */
   id: int("id").autoincrement().primaryKey(),
-  /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
-  openId: varchar("openId", { length: 64 }).notNull().unique(),
+  email: varchar("email", { length: 320 }).notNull().unique(),
   name: text("name"),
-  email: varchar("email", { length: 320 }),
-  loginMethod: varchar("loginMethod", { length: 64 }),
+  passwordHash: varchar("passwordHash", { length: 255 }), // For email/password auth
+  provider: varchar("provider", { length: 64 }), // 'google' or 'local'
+  providerId: varchar("providerId", { length: 255 }), // Google ID or null for local
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
-  tokenBalance: int("tokenBalance").default(1000).notNull(), // Баланс токенов для генерации процессов
+  tokenBalance: int("tokenBalance").default(1000).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
