@@ -1,75 +1,12 @@
 {
   "version": "7",
-  "dialect": "mysql",
+  "dialect": "postgresql",
   "entries": [
     {
       "idx": 0,
-      "version": "5",
-      "when": 1763439604307,
-      "tag": "0000_uneven_mister_fear",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "5",
-      "when": 1763439680843,
-      "tag": "0001_long_overlord",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "5",
-      "when": 1763533198281,
-      "tag": "0002_thankful_molecule_man",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "5",
-      "when": 1763536475685,
-      "tag": "0003_loose_praxagora",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "5",
-      "when": 1763667356367,
-      "tag": "0004_past_hammerhead",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "5",
-      "when": 1763991395333,
-      "tag": "0005_shiny_vengeance",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "5",
-      "when": 1764021984450,
-      "tag": "0006_aromatic_sally_floyd",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "5",
-      "when": 1764022798905,
-      "tag": "0007_robust_ravenous",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "5",
-      "when": 1764793762820,
-      "tag": "0008_dizzy_gorgon",
-      "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "5",
-      "when": 1764794923892,
-      "tag": "0009_low_lorna_dane",
+      "version": "7",
+      "when": 1764800343052,
+      "tag": "0000_tearful_preak",
       "breakpoints": true
     }
   ]

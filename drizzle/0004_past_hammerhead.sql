@@ -1,1 +1,0 @@
-ALTER TABLE `users` ADD `tokenBalance` int DEFAULT 1000 NOT NULL;
