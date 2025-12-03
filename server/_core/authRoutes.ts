@@ -80,17 +80,7 @@ router.post('/logout', (req, res) => {
   });
 });
 
-// Google OAuth
-router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
-router.get(
-  '/google/callback',
-  passport.authenticate('google', { failureRedirect: '/login?error=auth_failed' }),
-  (req, res) => {
-    // Successful authentication, redirect to home
-    res.redirect('/');
-  }
-);
 
 // Get current user
 router.get('/me', (req, res) => {

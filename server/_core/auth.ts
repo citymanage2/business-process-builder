@@ -1,13 +1,11 @@
 /**
- * Authentication Module - Google OAuth & Email/Password
+ * Authentication Module - Email/Password
  * 
  * This module provides authentication using:
- * - Google OAuth 2.0
  * - Email/Password with bcrypt hashing
  */
 
 import passport from 'passport';
-import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { Strategy as LocalStrategy } from 'passport-local';
 import bcrypt from 'bcryptjs';
 import { getUserByEmail, getUserById, createUser, updateUserLastSignIn } from '../db';
@@ -17,47 +15,6 @@ import { ENV } from './env';
  * Configure Passport strategies
  */
 export function configurePassport() {
-  // Google OAuth Strategy
-  if (ENV.googleClientId && ENV.googleClientSecret) {
-    passport.use(
-      new GoogleStrategy(
-        {
-          clientID: ENV.googleClientId,
-          clientSecret: ENV.googleClientSecret,
-          callbackURL: '/api/auth/google/callback',
-        },
-        async (accessToken, refreshToken, profile, done) => {
-          try {
-            const email = profile.emails?.[0]?.value;
-            if (!email) {
-              return done(new Error('No email found in Google profile'));
-            }
-
-            // Check if user exists
-            let user = await getUserByEmail(email);
-
-            if (!user) {
-              // Create new user
-              user = await createUser({
-                email,
-                name: profile.displayName,
-                provider: 'google',
-                providerId: profile.id,
-              });
-            } else {
-              // Update last sign in
-              await updateUserLastSignIn(user.id);
-            }
-
-            return done(null, user);
-          } catch (error) {
-            return done(error as Error);
-          }
-        }
-      )
-    );
-  }
-
   // Local Strategy (Email/Password)
   passport.use(
     new LocalStrategy(

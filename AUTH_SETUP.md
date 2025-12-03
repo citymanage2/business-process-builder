@@ -1,8 +1,6 @@
 # Настройка авторизации
 
-Проект поддерживает два способа авторизации:
-1. **Google OAuth 2.0** - вход через аккаунт Google
-2. **Email/Password** - традиционная регистрация с email и паролем
+Проект использует традиционную авторизацию через **Email/Password** с использованием Passport.js и bcrypt.
 
 ---
 
@@ -11,67 +9,17 @@
 Добавьте в `.env` файл:
 
 ```env
-# Google OAuth (обязательно для входа через Google)
-GOOGLE_CLIENT_ID=your_google_client_id
-GOOGLE_CLIENT_SECRET=your_google_client_secret
-GOOGLE_CALLBACK_URL=http://localhost:3000/api/auth/google/callback
-
 # Session secret (обязательно)
 SESSION_SECRET=your_random_secret_key_min_32_chars
 
+# Database (обязательно)
+DATABASE_URL=mysql://user:password@host:port/database
+
 # Owner email (опционально - для автоматического назначения роли admin)
 OWNER_EMAIL=your@email.com
-```
 
----
-
-## 📝 Получение Google OAuth credentials
-
-### Шаг 1: Создайте проект в Google Cloud Console
-
-1. Перейдите на https://console.cloud.google.com/
-2. Создайте новый проект или выберите существующий
-3. В меню слева выберите **APIs & Services** → **Credentials**
-
-### Шаг 2: Настройте OAuth consent screen
-
-1. Нажмите **OAuth consent screen** в левом меню
-2. Выберите **External** и нажмите **Create**
-3. Заполните обязательные поля:
-   - App name: `Business Process Builder`
-   - User support email: ваш email
-   - Developer contact: ваш email
-4. Нажмите **Save and Continue**
-5. На странице **Scopes** нажмите **Add or Remove Scopes**
-6. Выберите:
-   - `.../auth/userinfo.email`
-   - `.../auth/userinfo.profile`
-7. Нажмите **Save and Continue**
-8. На странице **Test users** добавьте тестовые email (если приложение в режиме Testing)
-9. Нажмите **Save and Continue**
-
-### Шаг 3: Создайте OAuth 2.0 Client ID
-
-1. Вернитесь в **Credentials**
-2. Нажмите **+ CREATE CREDENTIALS** → **OAuth client ID**
-3. Выберите **Application type**: **Web application**
-4. Заполните:
-   - Name: `Business Process Builder Web`
-   - Authorized JavaScript origins:
-     - `http://localhost:3000` (для разработки)
-     - `https://yourdomain.com` (для production)
-   - Authorized redirect URIs:
-     - `http://localhost:3000/api/auth/google/callback` (для разработки)
-     - `https://yourdomain.com/api/auth/google/callback` (для production)
-5. Нажмите **Create**
-6. Скопируйте **Client ID** и **Client Secret**
-
-### Шаг 4: Добавьте credentials в .env
-
-```env
-GOOGLE_CLIENT_ID=123456789-abcdefg.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=GOCSPX-abcdefghijklmnop
-GOOGLE_CALLBACK_URL=http://localhost:3000/api/auth/google/callback
+# Claude API (обязательно для AI функций)
+CLAUDE_API_KEY=sk-ant-api03-...
 ```
 
 ---
@@ -98,6 +46,8 @@ https://generate-secret.vercel.app/32
 SESSION_SECRET=your_generated_secret_here
 ```
 
+**Важно:** SESSION_SECRET должен быть минимум 32 символа для безопасности.
+
 ---
 
 ## 👤 Настройка владельца (Owner)
@@ -110,10 +60,15 @@ OWNER_EMAIL=owner@example.com
 
 Если не указать - все пользователи будут иметь роль `user`.
 
-Чтобы вручную назначить админа:
+### Ручное назначение админа:
+
 1. Зайдите в базу данных
 2. Найдите пользователя в таблице `users`
 3. Измените поле `role` на `admin`
+
+```sql
+UPDATE users SET role = 'admin' WHERE email = 'your@email.com';
+```
 
 ---
 
@@ -121,27 +76,19 @@ OWNER_EMAIL=owner@example.com
 
 ### Для Render.com:
 
-1. В настройках проекта добавьте Environment Variables:
+В настройках проекта добавьте Environment Variables:
 ```
-GOOGLE_CLIENT_ID=your_client_id
-GOOGLE_CLIENT_SECRET=your_secret
-GOOGLE_CALLBACK_URL=https://your-app.onrender.com/api/auth/google/callback
 SESSION_SECRET=your_generated_secret
+DATABASE_URL=your_database_url
 OWNER_EMAIL=your@email.com
-```
-
-2. В Google Cloud Console добавьте production URL в Authorized redirect URIs:
-```
-https://your-app.onrender.com/api/auth/google/callback
+CLAUDE_API_KEY=sk-ant-...
 ```
 
 ### Для Vercel:
 
-1. В настройках проекта добавьте Environment Variables (те же)
-2. Обновите `GOOGLE_CALLBACK_URL`:
-```
-GOOGLE_CALLBACK_URL=https://your-app.vercel.app/api/auth/google/callback
-```
+В настройках проекта добавьте те же Environment Variables.
+
+**Важно:** В production всегда используйте HTTPS (автоматически на Render/Vercel).
 
 ---
 
@@ -154,9 +101,8 @@ GOOGLE_CALLBACK_URL=https://your-app.vercel.app/api/auth/google/callback
 3. Попробуйте:
    - Регистрацию через Email/Password
    - Вход через Email/Password
-   - Вход через Google
 
-### Проверка авторизации:
+### Проверка через API:
 
 ```bash
 # Регистрация
@@ -167,27 +113,19 @@ curl -X POST http://localhost:3000/api/auth/register \
 # Вход
 curl -X POST http://localhost:3000/api/auth/login \
   -H "Content-Type: application/json" \
+  -c cookies.txt \
   -d '{"email":"test@example.com","password":"test123"}'
 
 # Получить текущего пользователя
-curl http://localhost:3000/api/auth/me
+curl http://localhost:3000/api/auth/me -b cookies.txt
 
 # Выход
-curl -X POST http://localhost:3000/api/auth/logout
+curl -X POST http://localhost:3000/api/auth/logout -b cookies.txt
 ```
 
 ---
 
 ## ❓ Частые проблемы
-
-### "redirect_uri_mismatch"
-
-**Причина:** URL в Google Cloud Console не совпадает с `GOOGLE_CALLBACK_URL`
-
-**Решение:** 
-1. Проверьте что URL в `.env` точно совпадает с URL в Google Console
-2. Убедитесь что нет лишних слешей в конце
-3. Проверьте протокол (http vs https)
 
 ### "Invalid session secret"
 
@@ -195,19 +133,32 @@ curl -X POST http://localhost:3000/api/auth/logout
 
 **Решение:** Сгенерируйте новый secret минимум 32 символа
 
-### Пользователь не может войти
+### Пользователь не может войти после регистрации
 
-**Причина:** Email не подтвержден в Google или приложение в режиме Testing
+**Причина:** Неверный пароль или email
 
 **Решение:** 
-1. Добавьте email в Test users в Google Cloud Console
-2. Или опубликуйте приложение (Publish App)
+1. Проверьте что email указан правильно
+2. Убедитесь что пароль минимум 6 символов
+3. Проверьте что пользователь зарегистрирован в БД
 
-### Google OAuth не работает в production
+### Сессия не сохраняется
 
-**Причина:** Не обновлены Authorized redirect URIs
+**Причина:** Проблемы с cookies или SESSION_SECRET
 
-**Решение:** Добавьте production URL в Google Cloud Console
+**Решение:**
+1. Проверьте что SESSION_SECRET установлен
+2. В production убедитесь что используется HTTPS
+3. Проверьте настройки cookies в браузере
+
+### База данных не подключается
+
+**Причина:** Неверный DATABASE_URL
+
+**Решение:** Проверьте формат строки подключения:
+```
+mysql://username:password@host:port/database_name
+```
 
 ---
 
@@ -215,14 +166,53 @@ curl -X POST http://localhost:3000/api/auth/logout
 
 1. **Никогда не коммитьте `.env` файл** - он уже в `.gitignore`
 2. **Используйте разные secrets** для development и production
-3. **Регулярно обновляйте** `SESSION_SECRET` и `GOOGLE_CLIENT_SECRET`
+3. **Регулярно обновляйте** `SESSION_SECRET`
 4. **Включите HTTPS** в production (автоматически на Render/Vercel)
-5. **Ограничьте доступ** к Google Cloud Console
+5. **Используйте сильные пароли** - минимум 8 символов, включая цифры и спецсимволы
+6. **Ограничьте попытки входа** - рассмотрите добавление rate limiting
+
+---
+
+## 📊 Структура базы данных
+
+Таблица `users`:
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| id | int | Первичный ключ |
+| email | varchar(320) | Email пользователя (уникальный) |
+| name | text | Имя пользователя |
+| passwordHash | varchar(255) | Хэш пароля (bcrypt) |
+| provider | varchar(64) | Провайдер авторизации ('local') |
+| providerId | varchar(255) | ID от провайдера (null для local) |
+| role | enum | Роль: 'user' или 'admin' |
+| tokenBalance | int | Баланс токенов |
+| createdAt | timestamp | Дата создания |
+| updatedAt | timestamp | Дата обновления |
+| lastSignedIn | timestamp | Последний вход |
+
+---
+
+## 🔄 Миграция данных
+
+Если у вас уже есть пользователи в БД:
+
+```sql
+-- Обновить провайдер для существующих пользователей
+UPDATE users SET provider = 'local' WHERE provider IS NULL;
+
+-- Добавить пароль для тестовых пользователей (пароль: test123)
+UPDATE users 
+SET passwordHash = '$2a$10$YourBcryptHashHere' 
+WHERE email = 'test@example.com';
+```
+
+**Важно:** Используйте bcrypt для генерации хэша пароля, не храните пароли в открытом виде.
 
 ---
 
 ## 📚 Дополнительная информация
 
-- [Google OAuth 2.0 Documentation](https://developers.google.com/identity/protocols/oauth2)
 - [Passport.js Documentation](http://www.passportjs.org/)
 - [Express Session Documentation](https://github.com/expressjs/session)
+- [bcrypt Documentation](https://github.com/kelektiv/node.bcrypt.js)
