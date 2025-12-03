@@ -11,7 +11,8 @@ import {
   InsertErrorLog, errorLogs,
   InsertSupportChat, supportChats,
   InsertSupportMessage, supportMessages,
-  InsertFaqArticle, faqArticles, FaqArticle
+  InsertFaqArticle, faqArticles, FaqArticle,
+  InsertVerificationToken, verificationTokens, VerificationToken
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -653,4 +654,55 @@ export async function getFaqArticleById(id: number): Promise<FaqArticle | undefi
   
   const result = await db.select().from(faqArticles).where(eq(faqArticles.id, id)).limit(1);
   return result[0];
+}
+
+
+// ============ Verification Tokens ============
+
+export async function createVerificationToken(data: InsertVerificationToken): Promise<VerificationToken> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(verificationTokens).values(data);
+  const insertedId = Number(result[0].insertId);
+
+  const token = await db.select().from(verificationTokens).where(eq(verificationTokens.id, insertedId)).limit(1);
+  return token[0];
+}
+
+export async function getVerificationToken(token: string): Promise<VerificationToken | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(verificationTokens).where(eq(verificationTokens.token, token)).limit(1);
+  return result[0];
+}
+
+export async function deleteVerificationToken(token: string): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.delete(verificationTokens).where(eq(verificationTokens.token, token));
+}
+
+export async function deleteExpiredTokens(): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+
+  const now = new Date();
+  await db.delete(verificationTokens).where(eq(verificationTokens.expiresAt, now));
+}
+
+export async function verifyUserEmail(userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(users).set({ emailVerified: 1 }).where(eq(users.id, userId));
+}
+
+export async function updateUserPassword(userId: number, passwordHash: string): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(users).set({ passwordHash }).where(eq(users.id, userId));
 }

@@ -17,6 +17,7 @@ export const users = mysqlTable("users", {
   provider: varchar("provider", { length: 64 }), // 'google' or 'local'
   providerId: varchar("providerId", { length: 255 }), // Google ID or null for local
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  emailVerified: int("emailVerified").default(0).notNull(), // 0 = not verified, 1 = verified
   tokenBalance: int("tokenBalance").default(1000).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -208,3 +209,18 @@ export const faqArticles = mysqlTable("faq_articles", {
 
 export type FaqArticle = typeof faqArticles.$inferSelect;
 export type InsertFaqArticle = typeof faqArticles.$inferInsert;
+
+/**
+ * Verification tokens table for email verification and password reset
+ */
+export const verificationTokens = mysqlTable("verification_tokens", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  token: varchar("token", { length: 255 }).notNull().unique(),
+  type: mysqlEnum("type", ["email_verification", "password_reset"]).notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type VerificationToken = typeof verificationTokens.$inferSelect;
+export type InsertVerificationToken = typeof verificationTokens.$inferInsert;

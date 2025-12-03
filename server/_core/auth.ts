@@ -40,6 +40,11 @@ export function configurePassport() {
             return done(null, false, { message: 'Неверный email или пароль' });
           }
 
+          // Check if email is verified
+          if (!user.emailVerified) {
+            return done(null, false, { message: 'Подтвердите email перед входом. Проверьте почту.' });
+          }
+
           await updateUserLastSignIn(user.id);
 
           return done(null, user);

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useLocation } from 'wouter';
+import { useLocation, Link } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -67,8 +67,13 @@ export default function Login() {
       const data = await response.json();
 
       if (response.ok) {
-        toast.success('Регистрация успешна!');
-        window.location.href = '/';
+        if (data.requiresVerification) {
+          toast.success(data.message || 'Проверьте email для подтверждения!');
+          // Don't redirect, show message
+        } else {
+          toast.success('Регистрация успешна!');
+          window.location.href = '/';
+        }
       } else {
         toast.error(data.error || 'Ошибка регистрации');
       }
@@ -123,6 +128,13 @@ export default function Login() {
                     onChange={(e) => setLoginPassword(e.target.value)}
                     required
                   />
+                </div>
+                <div className="flex justify-end">
+                  <Link href="/forgot-password">
+                    <a className="text-sm text-indigo-600 hover:text-indigo-800 underline">
+                      Забыли пароль?
+                    </a>
+                  </Link>
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? 'Вход...' : 'Войти'}

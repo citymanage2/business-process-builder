@@ -1,6 +1,9 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
+import VerifyEmail from "@/pages/VerifyEmail";
+import ResetPassword from "@/pages/ResetPassword";
+import ForgotPassword from "@/pages/ForgotPassword";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -22,9 +25,11 @@ import SupportChat from "./components/SupportChat";
 function Router() {
   // make sure to consider if you need authentication for certain routes
   return (
-    <Switch>
-      <Route path={"/"} component={Home} />
-      <Route path={"/login"} component={Login} />
+    <Switch>      <Route path={"/"} component={Home} />
+      <Route path={"/verify-email"} component={VerifyEmail} />
+      <Route path={"/reset-password"} component={ResetPassword} />
+      <Route path={"/forgot-password"} component={ForgotPassword} />
+      <Route path={"/404"} component={NotFound} />
       <Route path={"/faq"} component={FAQ} />
       <Route path={"/companies"} component={Companies} />
       <Route path="/interview-choice/:id" component={InterviewChoice} />
