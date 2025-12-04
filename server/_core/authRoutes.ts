@@ -54,12 +54,20 @@ router.post('/register', async (req, res) => {
     });
 
     // Send verification email
-    await sendVerificationEmail(data.email, token);
+    const emailSent = await sendVerificationEmail(data.email, token);
+    
+    if (!emailSent) {
+      console.error('[Auth] Failed to send verification email to:', data.email);
+      // Still allow registration to succeed, but warn user
+    }
 
     res.json({ 
       success: true, 
-      message: 'Регистрация успешна! Проверьте email для подтверждения адреса.',
-      requiresVerification: true
+      message: emailSent 
+        ? 'Регистрация успешна! Проверьте email для подтверждения адреса.'
+        : 'Регистрация успешна! Но письмо не удалось отправить. Обратитесь к администратору.',
+      requiresVerification: true,
+      emailSent
     });
   } catch (error) {
     console.error('[Auth] Registration error:', error);

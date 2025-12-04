@@ -12,19 +12,35 @@ function getTransporter() {
   if (!transporter) {
     // Check if SMTP is configured
     if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
-      console.warn('[Email] SMTP not configured. Emails will not be sent.');
+      console.warn('[Email] SMTP not configured. Missing:', {
+        host: !!process.env.SMTP_HOST,
+        user: !!process.env.SMTP_USER,
+        pass: !!process.env.SMTP_PASS
+      });
       return null;
     }
-
-    transporter = nodemailer.createTransport({
+    
+    console.log('[Email] Initializing SMTP transport:', {
       host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: process.env.SMTP_PORT === '465', // true for 465, false for other ports
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
+      port: process.env.SMTP_PORT || '587',
+      user: process.env.SMTP_USER
     });
+
+    try {
+      transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: parseInt(process.env.SMTP_PORT || '587'),
+        secure: process.env.SMTP_PORT === '465', // true for 465, false for other ports
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+        },
+      });
+      console.log('[Email] SMTP transport created successfully');
+    } catch (error) {
+      console.error('[Email] Failed to create SMTP transport:', error);
+      return null;
+    }
   }
   return transporter;
 }
@@ -50,7 +66,9 @@ export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
   try {
     const from = process.env.SMTP_FROM || process.env.SMTP_USER;
     
-    await transport.sendMail({
+    console.log(`[Email] Attempting to send to ${options.to}: ${options.subject}`);
+    
+    const info = await transport.sendMail({
       from,
       to: options.to,
       subject: options.subject,
@@ -58,10 +76,13 @@ export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
       text: options.text || options.html.replace(/<[^>]*>/g, ''), // Strip HTML tags for text version
     });
 
-    console.log(`[Email] Sent to ${options.to}: ${options.subject}`);
+    console.log(`[Email] Successfully sent to ${options.to}:`, {
+      messageId: info.messageId,
+      response: info.response
+    });
     return true;
   } catch (error) {
-    console.error('[Email] Failed to send:', error);
+    console.error('[Email] Failed to send to', options.to, ':', error);
     return false;
   }
 }
