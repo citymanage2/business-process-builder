@@ -1,48 +1,33 @@
 /**
- * Email Module - Send emails via nodemailer
+ * Email Module - Send emails via SendGrid
+ * Uses SendGrid API instead of SMTP (works on Render free tier)
  */
 
-import nodemailer from 'nodemailer';
-import { ENV } from './env';
+import sgMail from '@sendgrid/mail';
 
-// Create reusable transporter
-let transporter: nodemailer.Transporter | null = null;
+// Initialize SendGrid
+let isInitialized = false;
 
-function getTransporter() {
-  if (!transporter) {
-    // Check if SMTP is configured
-    if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
-      console.warn('[Email] SMTP not configured. Missing:', {
-        host: !!process.env.SMTP_HOST,
-        user: !!process.env.SMTP_USER,
-        pass: !!process.env.SMTP_PASS
-      });
-      return null;
-    }
-    
-    console.log('[Email] Initializing SMTP transport:', {
-      host: process.env.SMTP_HOST,
-      port: process.env.SMTP_PORT || '587',
-      user: process.env.SMTP_USER
-    });
+function initializeSendGrid() {
+  if (isInitialized) return true;
 
-    try {
-      transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: parseInt(process.env.SMTP_PORT || '587'),
-        secure: process.env.SMTP_PORT === '465', // true for 465, false for other ports
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
-        },
-      });
-      console.log('[Email] SMTP transport created successfully');
-    } catch (error) {
-      console.error('[Email] Failed to create SMTP transport:', error);
-      return null;
-    }
+  const apiKey = process.env.SENDGRID_API_KEY;
+  
+  if (!apiKey) {
+    console.warn('[Email] SendGrid API key not configured. Emails will not be sent.');
+    console.warn('[Email] Set SENDGRID_API_KEY environment variable.');
+    return false;
   }
-  return transporter;
+
+  try {
+    sgMail.setApiKey(apiKey);
+    isInitialized = true;
+    console.log('[Email] SendGrid initialized successfully');
+    return true;
+  } catch (error) {
+    console.error('[Email] Failed to initialize SendGrid:', error);
+    return false;
+  }
 }
 
 export interface SendEmailOptions {
@@ -53,36 +38,40 @@ export interface SendEmailOptions {
 }
 
 /**
- * Send email
+ * Send email via SendGrid
  */
 export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
-  const transport = getTransporter();
-  
-  if (!transport) {
-    console.warn('[Email] Cannot send email - SMTP not configured');
+  if (!initializeSendGrid()) {
+    console.warn('[Email] Cannot send email - SendGrid not configured');
     return false;
   }
 
   try {
-    const from = process.env.SMTP_FROM || process.env.SMTP_USER;
+    const from = process.env.SENDGRID_FROM_EMAIL || process.env.SMTP_FROM || 'noreply@business-process-builder.com';
     
-    console.log(`[Email] Attempting to send to ${options.to}: ${options.subject}`);
+    console.log(`[Email] Attempting to send via SendGrid to ${options.to}: ${options.subject}`);
     
-    const info = await transport.sendMail({
-      from,
+    const msg = {
       to: options.to,
+      from: from,
       subject: options.subject,
-      html: options.html,
       text: options.text || options.html.replace(/<[^>]*>/g, ''), // Strip HTML tags for text version
-    });
+      html: options.html,
+    };
 
+    const response = await sgMail.send(msg);
+    
     console.log(`[Email] Successfully sent to ${options.to}:`, {
-      messageId: info.messageId,
-      response: info.response
+      statusCode: response[0].statusCode,
+      headers: response[0].headers
     });
     return true;
-  } catch (error) {
-    console.error('[Email] Failed to send to', options.to, ':', error);
+  } catch (error: any) {
+    console.error('[Email] Failed to send to', options.to, ':', {
+      message: error.message,
+      code: error.code,
+      response: error.response?.body
+    });
     return false;
   }
 }
