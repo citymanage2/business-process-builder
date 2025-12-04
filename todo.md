@@ -309,3 +309,7 @@
 - [x] Удалить старые MySQL миграции
 - [x] Создать чистые PostgreSQL миграции
 - [x] Обновить архив для GitHub
+
+## Исправление SESSION_SECRET для Render (декабрь 2025)
+- [x] Исправить чтение SESSION_SECRET из process.env
+- [ ] Обновить GitHub
