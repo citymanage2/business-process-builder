@@ -312,4 +312,8 @@
 
 ## Исправление SESSION_SECRET для Render (декабрь 2025)
 - [x] Исправить чтение SESSION_SECRET из process.env
+- [x] Обновить GitHub
+
+## Исправление 404 в production (декабрь 2025)
+- [x] Исправить раздачу статических файлов в production
 - [ ] Обновить GitHub
