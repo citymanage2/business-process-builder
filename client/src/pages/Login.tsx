@@ -7,10 +7,12 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { APP_LOGO, APP_TITLE } from '@/const';
 import { toast } from 'sonner';
+import { Loader2 } from 'lucide-react';
 
 export default function Login() {
   const [, setLocation] = useLocation();
   const [isLoading, setIsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('login');
   
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
@@ -68,8 +70,13 @@ export default function Login() {
 
       if (response.ok) {
         if (data.requiresVerification) {
-          toast.success(data.message || 'Проверьте email для подтверждения!');
-          // Don't redirect, show message
+          toast.success(data.message || 'Регистрация успешна! Проверьте email для подтверждения.');
+          // Switch to login tab after successful registration
+          setTimeout(() => {
+            setActiveTab('login');
+            // Pre-fill email in login form
+            setLoginEmail(registerEmail);
+          }, 2000);
         } else {
           toast.success('Регистрация успешна!');
           window.location.href = '/';
@@ -99,7 +106,7 @@ export default function Login() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="login" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">Вход</TabsTrigger>
               <TabsTrigger value="register">Регистрация</TabsTrigger>
@@ -137,7 +144,14 @@ export default function Login() {
                   </Link>
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? 'Вход...' : 'Войти'}
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Вход...
+                    </>
+                  ) : (
+                    'Войти'
+                  )}
                 </Button>
               </form>
 
@@ -182,7 +196,14 @@ export default function Login() {
                   </p>
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? 'Регистрация...' : 'Зарегистрироваться'}
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Регистрация...
+                    </>
+                  ) : (
+                    'Зарегистрироваться'
+                  )}
                 </Button>
               </form>
 
