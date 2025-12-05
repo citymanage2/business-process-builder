@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useLocation, Link } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/phone-input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -175,12 +176,10 @@ export default function Login() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="register-phone">Номер телефона</Label>
-                  <Input
-                    id="register-phone"
-                    type="tel"
-                    placeholder="+7 (999) 123-45-67"
+                  <PhoneInput
                     value={registerPhone}
-                    onChange={(e) => setRegisterPhone(e.target.value)}
+                    onChange={(value) => setRegisterPhone(value || '')}
+                    placeholder="+7 (999) 123-45-67"
                   />
                   <p className="text-xs text-muted-foreground">
                     Укажите email или телефон (или оба)
