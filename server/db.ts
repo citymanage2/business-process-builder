@@ -12,8 +12,7 @@ import {
   InsertErrorLog, errorLogs,
   InsertSupportChat, supportChats,
   InsertSupportMessage, supportMessages,
-  InsertFaqArticle, faqArticles, FaqArticle,
-  InsertVerificationToken, verificationTokens, VerificationToken
+  InsertFaqArticle, faqArticles, FaqArticle
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -33,22 +32,23 @@ export async function getDb() {
   return _db;
 }
 
-export async function createUser(data: { email: string; name?: string; provider?: string; providerId?: string; passwordHash?: string }) {
+export async function createUser(data: { email?: string; phone?: string; name?: string; provider?: string; providerId?: string; passwordHash?: string }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
   const values: InsertUser = {
     email: data.email,
-    name: data.name || null,
+    phone: data.phone,
+    name: data.name,
     provider: data.provider || 'local',
-    providerId: data.providerId || null,
-    passwordHash: data.passwordHash || null,
+    providerId: data.providerId,
+    passwordHash: data.passwordHash,
     tokenBalance: 1000,
     lastSignedIn: new Date(),
   };
 
   // Set admin role for owner email
-  if (data.email === ENV.ownerEmail) {
+  if (data.email && data.email === ENV.ownerEmail) {
     values.role = 'admin';
   }
 
@@ -659,47 +659,14 @@ export async function getFaqArticleById(id: number): Promise<FaqArticle | undefi
 }
 
 
-// ============ Verification Tokens ============
+// ============ User Auth Helpers ============
 
-export async function createVerificationToken(data: InsertVerificationToken): Promise<VerificationToken> {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const result = await db.insert(verificationTokens).values(data).returning({ id: verificationTokens.id });
-  const insertedId = result[0].id;
-
-  const token = await db.select().from(verificationTokens).where(eq(verificationTokens.id, insertedId)).limit(1);
-  return token[0];
-}
-
-export async function getVerificationToken(token: string): Promise<VerificationToken | undefined> {
+export async function getUserByPhone(phone: string) {
   const db = await getDb();
   if (!db) return undefined;
 
-  const result = await db.select().from(verificationTokens).where(eq(verificationTokens.token, token)).limit(1);
-  return result[0];
-}
-
-export async function deleteVerificationToken(token: string): Promise<void> {
-  const db = await getDb();
-  if (!db) return;
-
-  await db.delete(verificationTokens).where(eq(verificationTokens.token, token));
-}
-
-export async function deleteExpiredTokens(): Promise<void> {
-  const db = await getDb();
-  if (!db) return;
-
-  const now = new Date();
-  await db.delete(verificationTokens).where(eq(verificationTokens.expiresAt, now));
-}
-
-export async function verifyUserEmail(userId: number): Promise<void> {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  await db.update(users).set({ emailVerified: 1 }).where(eq(users.id, userId));
+  const result = await db.select().from(users).where(eq(users.phone, phone)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
 }
 
 export async function updateUserPassword(userId: number, passwordHash: string): Promise<void> {

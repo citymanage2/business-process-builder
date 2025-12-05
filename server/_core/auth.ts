@@ -8,26 +8,31 @@
 import passport from 'passport';
 import { Strategy as LocalStrategy } from 'passport-local';
 import bcrypt from 'bcryptjs';
-import { getUserByEmail, getUserById, createUser, updateUserLastSignIn } from '../db';
+import { getUserByEmail, getUserByPhone, getUserById, createUser, updateUserLastSignIn } from '../db';
 import { ENV } from './env';
 
 /**
  * Configure Passport strategies
  */
 export function configurePassport() {
-  // Local Strategy (Email/Password)
+  // Local Strategy (Email/Phone + Password)
   passport.use(
     new LocalStrategy(
       {
-        usernameField: 'email',
+        usernameField: 'email', // Can be email or phone
         passwordField: 'password',
       },
-      async (email, password, done) => {
+      async (emailOrPhone, password, done) => {
         try {
-          const user = await getUserByEmail(email);
+          // Try to find user by email or phone
+          let user = await getUserByEmail(emailOrPhone);
+          
+          if (!user) {
+            user = await getUserByPhone(emailOrPhone);
+          }
 
           if (!user) {
-            return done(null, false, { message: 'Неверный email или пароль' });
+            return done(null, false, { message: 'Неверный email/телефон или пароль' });
           }
 
           if (!user.passwordHash) {
@@ -37,12 +42,7 @@ export function configurePassport() {
           const isValid = await bcrypt.compare(password, user.passwordHash);
 
           if (!isValid) {
-            return done(null, false, { message: 'Неверный email или пароль' });
-          }
-
-          // Check if email is verified
-          if (!user.emailVerified) {
-            return done(null, false, { message: 'Подтвердите email перед входом. Проверьте почту.' });
+            return done(null, false, { message: 'Неверный email/телефон или пароль' });
           }
 
           await updateUserLastSignIn(user.id);

@@ -15,15 +15,14 @@ export default function Login() {
   const [activeTab, setActiveTab] = useState('login');
   
   // Login form state
-  const [loginEmail, setLoginEmail] = useState('');
+  const [loginIdentifier, setLoginIdentifier] = useState(''); // Email or Phone
   const [loginPassword, setLoginPassword] = useState('');
   
   // Register form state
   const [registerEmail, setRegisterEmail] = useState('');
+  const [registerPhone, setRegisterPhone] = useState('');
   const [registerPassword, setRegisterPassword] = useState('');
   const [registerName, setRegisterName] = useState('');
-
-
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +32,7 @@ export default function Login() {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: loginEmail, password: loginPassword }),
+        body: JSON.stringify({ email: loginIdentifier, password: loginPassword }),
       });
 
       const data = await response.json();
@@ -53,6 +52,13 @@ export default function Login() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate that at least email or phone is provided
+    if (!registerEmail && !registerPhone) {
+      toast.error('Укажите email или номер телефона');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -60,7 +66,8 @@ export default function Login() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          email: registerEmail, 
+          email: registerEmail || undefined,
+          phone: registerPhone || undefined,
           password: registerPassword,
           name: registerName 
         }),
@@ -69,18 +76,13 @@ export default function Login() {
       const data = await response.json();
 
       if (response.ok) {
-        if (data.requiresVerification) {
-          toast.success(data.message || 'Регистрация успешна! Проверьте email для подтверждения.');
-          // Switch to login tab after successful registration
-          setTimeout(() => {
-            setActiveTab('login');
-            // Pre-fill email in login form
-            setLoginEmail(registerEmail);
-          }, 2000);
-        } else {
-          toast.success('Регистрация успешна!');
-          window.location.href = '/';
-        }
+        toast.success(data.message || 'Регистрация успешна! Теперь вы можете войти.');
+        // Switch to login tab after successful registration
+        setTimeout(() => {
+          setActiveTab('login');
+          // Pre-fill identifier in login form
+          setLoginIdentifier(registerEmail || registerPhone);
+        }, 2000);
       } else {
         toast.error(data.error || 'Ошибка регистрации');
       }
@@ -115,13 +117,13 @@ export default function Login() {
             <TabsContent value="login" className="space-y-4">
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="login-email">Email</Label>
+                  <Label htmlFor="login-identifier">Email или телефон</Label>
                   <Input
-                    id="login-email"
-                    type="email"
-                    placeholder="your@email.com"
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
+                    id="login-identifier"
+                    type="text"
+                    placeholder="your@email.com или +7..."
+                    value={loginIdentifier}
+                    onChange={(e) => setLoginIdentifier(e.target.value)}
                     required
                   />
                 </div>
@@ -136,13 +138,6 @@ export default function Login() {
                     required
                   />
                 </div>
-                <div className="flex justify-end">
-                  <Link href="/forgot-password">
-                    <a className="text-sm text-indigo-600 hover:text-indigo-800 underline">
-                      Забыли пароль?
-                    </a>
-                  </Link>
-                </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? (
                     <>
@@ -154,7 +149,6 @@ export default function Login() {
                   )}
                 </Button>
               </form>
-
             </TabsContent>
             
             <TabsContent value="register" className="space-y-4">
@@ -177,8 +171,20 @@ export default function Login() {
                     placeholder="your@email.com"
                     value={registerEmail}
                     onChange={(e) => setRegisterEmail(e.target.value)}
-                    required
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="register-phone">Номер телефона</Label>
+                  <Input
+                    id="register-phone"
+                    type="tel"
+                    placeholder="+7 (999) 123-45-67"
+                    value={registerPhone}
+                    onChange={(e) => setRegisterPhone(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Укажите email или телефон (или оба)
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="register-password">Пароль</Label>
@@ -206,7 +212,6 @@ export default function Login() {
                   )}
                 </Button>
               </form>
-
             </TabsContent>
           </Tabs>
         </CardContent>

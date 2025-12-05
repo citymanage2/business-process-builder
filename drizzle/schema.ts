@@ -16,7 +16,7 @@ export const categoryEnum = pgEnum("category", ["optimization", "automation", "r
 export const priorityEnum = pgEnum("priority", ["high", "medium", "low"]);
 export const chatStatusEnum = pgEnum("chat_status", ["open", "closed"]);
 export const senderRoleEnum = pgEnum("sender_role", ["user", "admin"]);
-export const tokenTypeEnum = pgEnum("token_type", ["email_verification", "password_reset"]);
+
 
 export const users = pgTable("users", {
   /**
@@ -24,13 +24,13 @@ export const users = pgTable("users", {
    * Use this for relations between tables.
    */
   id: serial("id").primaryKey(),
-  email: varchar("email", { length: 320 }).notNull().unique(),
+  email: varchar("email", { length: 320 }).unique(),
+  phone: varchar("phone", { length: 20 }).unique(),
   name: text("name"),
   passwordHash: varchar("password_hash", { length: 255 }), // For email/password auth
   provider: varchar("provider", { length: 64 }), // 'google' or 'local'
   providerId: varchar("provider_id", { length: 255 }), // Google ID or null for local
   role: roleEnum("role").default("user").notNull(),
-  emailVerified: integer("email_verified").default(0).notNull(), // 0 = not verified, 1 = verified
   tokenBalance: integer("token_balance").default(1000).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -224,17 +224,4 @@ export const faqArticles = pgTable("faq_articles", {
 export type FaqArticle = typeof faqArticles.$inferSelect;
 export type InsertFaqArticle = typeof faqArticles.$inferInsert;
 
-/**
- * Verification tokens table for email verification and password reset
- */
-export const verificationTokens = pgTable("verification_tokens", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  token: varchar("token", { length: 255 }).notNull().unique(),
-  type: tokenTypeEnum("type").notNull(),
-  expiresAt: timestamp("expires_at").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
 
-export type VerificationToken = typeof verificationTokens.$inferSelect;
-export type InsertVerificationToken = typeof verificationTokens.$inferInsert;
