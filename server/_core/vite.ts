@@ -63,7 +63,8 @@ export function serveStatic(app: Express) {
   // SPA fallback: serve index.html for all non-API routes
   app.use("*", (_req, res) => {
     res.sendFile(path.resolve(distPath, "index.html"), (err) => {
-      if (err) {
+      // Only handle errors if headers haven't been sent yet
+      if (err && !res.headersSent) {
         console.error("Error serving index.html:", err);
         res.status(500).send("Internal Server Error");
       }
