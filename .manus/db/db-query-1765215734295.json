@@ -1,0 +1,16 @@
+{
+  "query": "SELECT id, email, name, role FROM users WHERE email = 'citymanage.ekb@gmail.com' LIMIT 1;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2caBidRtXS3CBxe.9f9b2212b9bd --database AtkYmgPLTEDMC5w2gAV6C3 --execute SELECT id, email, name, role FROM users WHERE email = 'citymanage.ekb@gmail.com' LIMIT 1;",
+  "rows": [
+    {
+      "id": "1",
+      "email": "citymanage.ekb@gmail.com",
+      "name": "Сити Менедж",
+      "role": "admin"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\temail\tname\trole\n1\tcitymanage.ekb@gmail.com\tСити Менедж\tadmin\n",
+  "stderr": "",
+  "execution_time_ms": 896
+}

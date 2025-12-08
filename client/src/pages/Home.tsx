@@ -28,10 +28,10 @@ export default function Home() {
             {isAuthenticated ? (
               <>
                 <Link href="/profile">
-                  <Button variant="ghost">Профиль</Button>
+                  <Button variant="ghost">Личный кабинет</Button>
                 </Link>
                 <Link href="/companies">
-                  <Button>Мои компании</Button>
+                  <Button>Компании</Button>
                 </Link>
               </>
             ) : (
@@ -55,7 +55,7 @@ export default function Home() {
             {isAuthenticated ? (
               <Link href="/companies">
                 <Button size="lg" className="gap-2">
-                  Начать <ArrowRight className="w-5 h-5" />
+                  Создать компанию <ArrowRight className="w-5 h-5" />
                 </Button>
               </Link>
             ) : (
@@ -138,7 +138,7 @@ export default function Home() {
             {isAuthenticated ? (
               <Link href="/companies">
                 <Button size="lg" variant="secondary" className="gap-2">
-                  Создать процесс <ArrowRight className="w-5 h-5" />
+                  Создать компанию <ArrowRight className="w-5 h-5" />
                 </Button>
               </Link>
             ) : (
