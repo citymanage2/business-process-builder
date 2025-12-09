@@ -1,6 +1,5 @@
 import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
-import { TRPCClientError } from "@trpc/client";
 import { useCallback, useEffect, useMemo } from "react";
 
 type UseAuthOptions = {
@@ -13,40 +12,56 @@ export function useAuth(options?: UseAuthOptions) {
     options ?? {};
   const utils = trpc.useUtils();
 
+  // ✅ Запрос текущего пользователя с правильными настройками
   const meQuery = trpc.auth.me.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
-    refetchOnMount: 'always',
+    refetchOnMount: true,
+    staleTime: 1000 * 60 * 5, // ✅ Кеш на 5 минут
   });
 
+  // ✅ Улучшенная функция logout
   const logout = useCallback(async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await fetch('/api/auth/logout', { 
+        method: 'POST',
+        credentials: 'include' // ✅ ВАЖНО
+      });
+      
+      // ✅ Очищаем все состояние
       utils.auth.me.setData(undefined, null);
       await utils.auth.me.invalidate();
+      localStorage.removeItem('manus-runtime-user-info');
+      
+      // ✅ Перенаправляем на логин
       window.location.href = '/login';
     } catch (error) {
       console.error('Logout error:', error);
+      // В случае ошибки все равно перенаправляем
+      window.location.href = '/login';
     }
   }, [utils]);
 
+  // ✅ Вычисляем состояние авторизации
   const state = useMemo(() => {
-    localStorage.setItem(
-      "manus-runtime-user-info",
-      JSON.stringify(meQuery.data)
-    );
+    const user = meQuery.data ?? null;
+    
+    // ✅ Сохраняем в localStorage для синхронизации
+    if (user) {
+      localStorage.setItem("manus-runtime-user-info", JSON.stringify(user));
+    } else {
+      localStorage.removeItem("manus-runtime-user-info");
+    }
+    
     return {
-      user: meQuery.data ?? null,
+      user,
       loading: meQuery.isLoading,
       error: meQuery.error ?? null,
-      isAuthenticated: Boolean(meQuery.data),
+      isAuthenticated: Boolean(user),
     };
-  }, [
-    meQuery.data,
-    meQuery.error,
-    meQuery.isLoading,
-  ]);
+  }, [meQuery.data, meQuery.error, meQuery.isLoading]);
 
+  // ✅ Редирект на логин если не авторизован
   useEffect(() => {
     if (!redirectOnUnauthenticated) return;
     if (meQuery.isLoading) return;
@@ -54,7 +69,8 @@ export function useAuth(options?: UseAuthOptions) {
     if (typeof window === "undefined") return;
     if (window.location.pathname === redirectPath) return;
 
-    window.location.href = redirectPath
+    console.log('Redirecting to login: user not authenticated');
+    window.location.href = redirectPath;
   }, [
     redirectOnUnauthenticated,
     redirectPath,
