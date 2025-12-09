@@ -1,7 +1,7 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { db } from '../db';
+import { getDb } from '../db'; // ✅ ИСПРАВЛЕНО: импортируем getDb вместо db
 import { users } from '../../drizzle/schema';
 import { eq, or } from 'drizzle-orm';
 
@@ -19,6 +19,12 @@ router.post('/register', async (req, res) => {
 
     if (!password || password.length < 6) {
       return res.status(400).json({ error: 'Пароль должен быть минимум 6 символов' });
+    }
+
+    // ✅ ИСПРАВЛЕНО: Получаем db через getDb()
+    const db = await getDb();
+    if (!db) {
+      return res.status(500).json({ error: 'База данных недоступна' });
     }
 
     // Проверка существующего пользователя
@@ -63,6 +69,12 @@ router.post('/login', async (req, res) => {
     }
 
     console.log('Login attempt for:', email); // ✅ ДОБАВЛЕНО: для отладки
+
+    // ✅ ИСПРАВЛЕНО: Получаем db через getDb()
+    const db = await getDb();
+    if (!db) {
+      return res.status(500).json({ error: 'База данных недоступна' });
+    }
 
     // Ищем пользователя по email или телефону
     const [user] = await db.select().from(users).where(
