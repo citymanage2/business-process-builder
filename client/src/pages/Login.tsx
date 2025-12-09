@@ -25,74 +25,86 @@ export default function Login() {
   const [registerPassword, setRegisterPassword] = useState('');
   const [registerName, setRegisterName] = useState('');
 
+  
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
+  e.preventDefault();
+  setIsLoading(true);
 
-    try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: loginIdentifier, password: loginPassword }),
-      });
+  try {
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include', // ✅ ВАЖНО: отправка cookie
+      body: JSON.stringify({ 
+        email: loginIdentifier, 
+        password: loginPassword 
+      }),
+    });
 
-      const data = await response.json();
+    const data = await response.json();
 
-      if (response.ok) {
-        toast.success('Вход выполнен успешно!');
-        window.location.href = '/';
-      } else {
-        toast.error(data.error || 'Ошибка входа');
-      }
-    } catch (error) {
-      toast.error('Ошибка подключения к серверу');
-    } finally {
-      setIsLoading(false);
+    if (response.ok) {
+      toast.success('Вход выполнен успешно!');
+      
+      // ✅ Даем время на установку cookie
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // ✅ Принудительная перезагрузка страницы для обновления состояния
+      window.location.href = '/';
+    } else {
+      toast.error(data.error || 'Ошибка входа');
     }
-  };
+  } catch (error) {
+    console.error('Login error:', error);
+    toast.error('Ошибка подключения к серверу');
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    // Validate that at least email or phone is provided
-    if (!registerEmail && !registerPhone) {
-      toast.error('Укажите email или номер телефона');
-      return;
+  if (!registerEmail && !registerPhone) {
+    toast.error('Укажите email или номер телефона');
+    return;
+  }
+
+  setIsLoading(true);
+
+  try {
+    const response = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include', // ✅ ВАЖНО: отправка cookie
+      body: JSON.stringify({ 
+        email: registerEmail || undefined,
+        phone: registerPhone || undefined,
+        password: registerPassword,
+        name: registerName 
+      }),
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      toast.success(data.message || 'Регистрация успешна! Теперь вы можете войти.');
+      
+      // ✅ Переключаемся на вкладку входа
+      setTimeout(() => {
+        setActiveTab('login');
+        setLoginIdentifier(registerEmail || registerPhone);
+      }, 1500);
+    } else {
+      toast.error(data.error || 'Ошибка регистрации');
     }
-
-    setIsLoading(true);
-
-    try {
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          email: registerEmail || undefined,
-          phone: registerPhone || undefined,
-          password: registerPassword,
-          name: registerName 
-        }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        toast.success(data.message || 'Регистрация успешна! Теперь вы можете войти.');
-        // Switch to login tab after successful registration
-        setTimeout(() => {
-          setActiveTab('login');
-          // Pre-fill identifier in login form
-          setLoginIdentifier(registerEmail || registerPhone);
-        }, 2000);
-      } else {
-        toast.error(data.error || 'Ошибка регистрации');
-      }
-    } catch (error) {
-      toast.error('Ошибка подключения к серверу');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  } catch (error) {
+    console.error('Register error:', error);
+    toast.error('Ошибка подключения к серверу');
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
