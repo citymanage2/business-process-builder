@@ -33,13 +33,14 @@ router.post('/register', async (req, res) => {
     // Хешируем пароль
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Создаем пользователя
+    // ✅ ИСПРАВЛЕНО: Создаем пользователя с правильными полями
     const [user] = await db.insert(users).values({
       email: email || null,
       phone: phone || null,
-      password: hashedPassword,
+      passwordHash: hashedPassword, // ✅ ИСПРАВЛЕНО: было password
       name: name || null,
-      emailVerified: false,
+      provider: 'local', // ✅ ДОБАВЛЕНО: указываем провайдера
+      role: 'user', // ✅ ДОБАВЛЕНО: роль по умолчанию
     }).returning();
 
     res.json({ 
@@ -61,6 +62,8 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Укажите email/телефон и пароль' });
     }
 
+    console.log('Login attempt for:', email); // ✅ ДОБАВЛЕНО: для отладки
+
     // Ищем пользователя по email или телефону
     const [user] = await db.select().from(users).where(
       or(
@@ -69,15 +72,25 @@ router.post('/login', async (req, res) => {
       )
     ).limit(1);
 
-    if (!user || !user.password) {
+    if (!user) {
+      console.log('User not found'); // ✅ ДОБАВЛЕНО
       return res.status(401).json({ error: 'Неверный email/телефон или пароль' });
     }
 
+    // ✅ ИСПРАВЛЕНО: Проверяем passwordHash вместо password
+    if (!user.passwordHash) {
+      console.log('User has no password (OAuth user?)'); // ✅ ДОБАВЛЕНО
+      return res.status(401).json({ error: 'Пользователь зарегистрирован через OAuth' });
+    }
+
     // Проверяем пароль
-    const isValidPassword = await bcrypt.compare(password, user.password);
+    const isValidPassword = await bcrypt.compare(password, user.passwordHash);
     if (!isValidPassword) {
+      console.log('Invalid password'); // ✅ ДОБАВЛЕНО
       return res.status(401).json({ error: 'Неверный email/телефон или пароль' });
     }
+
+    console.log('Password valid, creating token...'); // ✅ ДОБАВЛЕНО
 
     // Создаем JWT токен
     const token = jwt.sign(
@@ -86,14 +99,18 @@ router.post('/login', async (req, res) => {
       { expiresIn: '30d' }
     );
 
+    console.log('Setting cookie...'); // ✅ ДОБАВЛЕНО
+
     // ✅ ВАЖНО: Устанавливаем cookie с правильными настройками
     res.cookie('token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production', // true для HTTPS
+      secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 дней
       path: '/',
     });
+
+    console.log('Cookie set, sending response'); // ✅ ДОБАВЛЕНО
 
     res.json({ 
       success: true,
@@ -111,6 +128,7 @@ router.post('/login', async (req, res) => {
 
 // ✅ Logout
 router.post('/logout', (req, res) => {
+  console.log('Logging out...'); // ✅ ДОБАВЛЕНО
   res.clearCookie('token', {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
