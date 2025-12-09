@@ -33,7 +33,7 @@ export default function Login() {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include', // вЬЕ –Ф–Ю–С–Р–Т–Ы–Х–Э–Ю: –Ю—В–њ—А–∞–≤–Ї–∞ cookie
+        credentials: 'include', // ✅ ДОБАВЛЕНО: Отправка cookie
         body: JSON.stringify({ 
           email: loginIdentifier, 
           password: loginPassword 
@@ -43,19 +43,19 @@ export default function Login() {
       const data = await response.json();
 
       if (response.ok) {
-        toast.success('–Т—Е–Њ–і –≤—Л–њ–Њ–ї–љ–µ–љ —Г—Б–њ–µ—И–љ–Њ!');
+        toast.success('Вход выполнен успешно!');
         
-        // вЬЕ –Ф–Ю–С–Р–Т–Ы–Х–Э–Ю: –Ф–∞–µ–Љ –≤—А–µ–Љ—П –љ–∞ —Г—Б—В–∞–љ–Њ–≤–Ї—Г cookie
+        // ✅ ДОБАВЛЕНО: Даем время на установку cookie
         await new Promise(resolve => setTimeout(resolve, 300));
         
-        // вЬЕ –Ш–Ч–Ь–Х–Э–Х–Э–Ю: –Я—А–Є–љ—Г–і–Є—В–µ–ї—М–љ–∞—П –њ–µ—А–µ–Ј–∞–≥—А—Г–Ј–Ї–∞
+        // ✅ ИЗМЕНЕНО: Принудительная перезагрузка
         window.location.href = '/';
       } else {
-        toast.error(data.error || '–Ю—И–Є–±–Ї–∞ –≤—Е–Њ–і–∞');
+        toast.error(data.error || 'Ошибка входа');
       }
     } catch (error) {
       console.error('Login error:', error);
-      toast.error('–Ю—И–Є–±–Ї–∞ –њ–Њ–і–Ї–ї—О—З–µ–љ–Є—П –Ї —Б–µ—А–≤–µ—А—Г');
+      toast.error('Ошибка подключения к серверу');
     } finally {
       setIsLoading(false);
     }
@@ -65,7 +65,7 @@ export default function Login() {
     e.preventDefault();
 
     if (!registerEmail && !registerPhone) {
-      toast.error('–£–Ї–∞–ґ–Є—В–µ email –Є–ї–Є –љ–Њ–Љ–µ—А —В–µ–ї–µ—Д–Њ–љ–∞');
+      toast.error('Укажите email или номер телефона');
       return;
     }
 
@@ -75,7 +75,7 @@ export default function Login() {
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include', // вЬЕ –Ф–Ю–С–Р–Т–Ы–Х–Э–Ю: –Ю—В–њ—А–∞–≤–Ї–∞ cookie
+        credentials: 'include', // ✅ ДОБАВЛЕНО: Отправка cookie
         body: JSON.stringify({ 
           email: registerEmail || undefined,
           phone: registerPhone || undefined,
@@ -87,19 +87,19 @@ export default function Login() {
       const data = await response.json();
 
       if (response.ok) {
-        toast.success(data.message || '–†–µ–≥–Є—Б—В—А–∞—Ж–Є—П —Г—Б–њ–µ—И–љ–∞! –Ґ–µ–њ–µ—А—М –≤—Л –Љ–Њ–ґ–µ—В–µ –≤–Њ–є—В–Є.');
+        toast.success(data.message || 'Регистрация успешна! Теперь вы можете войти.');
         
-        // вЬЕ –Ш–Ч–Ь–Х–Э–Х–Э–Ю: –£–ї—Г—З—И–µ–љ–љ–Њ–µ –њ–µ—А–µ–Ї–ї—О—З–µ–љ–Є–µ –љ–∞ –≤–Ї–ї–∞–і–Ї—Г –≤—Е–Њ–і–∞
+        // ✅ ИЗМЕНЕНО: Улучшенное переключение на вкладку входа
         setTimeout(() => {
           setActiveTab('login');
           setLoginIdentifier(registerEmail || registerPhone);
         }, 1500);
       } else {
-        toast.error(data.error || '–Ю—И–Є–±–Ї–∞ —А–µ–≥–Є—Б—В—А–∞—Ж–Є–Є');
+        toast.error(data.error || 'Ошибка регистрации');
       }
     } catch (error) {
       console.error('Register error:', error);
-      toast.error('–Ю—И–Є–±–Ї–∞ –њ–Њ–і–Ї–ї—О—З–µ–љ–Є—П –Ї —Б–µ—А–≤–µ—А—Г');
+      toast.error('Ошибка подключения к серверу');
     } finally {
       setIsLoading(false);
     }
@@ -116,35 +116,35 @@ export default function Login() {
           )}
           <CardTitle className="text-2xl font-bold">{APP_TITLE}</CardTitle>
           <CardDescription>
-            –Т–Њ–є–і–Є—В–µ –Є–ї–Є –Ј–∞—А–µ–≥–Є—Б—В—А–Є—А—Г–є—В–µ—Б—М –і–ї—П –њ—А–Њ–і–Њ–ї–ґ–µ–љ–Є—П
+            Войдите или зарегистрируйтесь для продолжения
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="login">–Т—Е–Њ–і</TabsTrigger>
-              <TabsTrigger value="register">–†–µ–≥–Є—Б—В—А–∞—Ж–Є—П</TabsTrigger>
+              <TabsTrigger value="login">Вход</TabsTrigger>
+              <TabsTrigger value="register">Регистрация</TabsTrigger>
             </TabsList>
             
             <TabsContent value="login" className="space-y-4">
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="login-identifier">Email –Є–ї–Є —В–µ–ї–µ—Д–Њ–љ</Label>
+                  <Label htmlFor="login-identifier">Email или телефон</Label>
                   <Input
                     id="login-identifier"
                     type="text"
-                    placeholder="your@email.com –Є–ї–Є +7..."
+                    placeholder="your@email.com или +7..."
                     value={loginIdentifier}
                     onChange={(e) => setLoginIdentifier(e.target.value)}
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="login-password">–Я–∞—А–Њ–ї—М</Label>
+                  <Label htmlFor="login-password">Пароль</Label>
                   <Input
                     id="login-password"
                     type="password"
-                    placeholder="вАҐвАҐвАҐвАҐвАҐвАҐвАҐвАҐ"
+                    placeholder="••••••••"
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
                     required
@@ -154,10 +154,10 @@ export default function Login() {
                   {isLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      –Т—Е–Њ–і...
+                      Вход...
                     </>
                   ) : (
-                    '–Т–Њ–є—В–Є'
+                    'Войти'
                   )}
                 </Button>
               </form>
@@ -166,11 +166,11 @@ export default function Login() {
             <TabsContent value="register" className="space-y-4">
               <form onSubmit={handleRegister} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="register-name">–Ш–Љ—П</Label>
+                  <Label htmlFor="register-name">Имя</Label>
                   <Input
                     id="register-name"
                     type="text"
-                    placeholder="–Т–∞—И–µ –Є–Љ—П"
+                    placeholder="Ваше имя"
                     value={registerName}
                     onChange={(e) => setRegisterName(e.target.value)}
                   />
@@ -186,39 +186,39 @@ export default function Login() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="register-phone">–Э–Њ–Љ–µ—А —В–µ–ї–µ—Д–Њ–љ–∞</Label>
+                  <Label htmlFor="register-phone">Номер телефона</Label>
                   <PhoneInput
                     value={registerPhone}
                     onChange={(value) => setRegisterPhone(value || '')}
                     placeholder="+7 (999) 123-45-67"
                   />
                   <p className="text-xs text-muted-foreground">
-                    –£–Ї–∞–ґ–Є—В–µ email –Є–ї–Є —В–µ–ї–µ—Д–Њ–љ (–Є–ї–Є –Њ–±–∞)
+                    Укажите email или телефон (или оба)
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="register-password">–Я–∞—А–Њ–ї—М</Label>
+                  <Label htmlFor="register-password">Пароль</Label>
                   <Input
                     id="register-password"
                     type="password"
-                    placeholder="вАҐвАҐвАҐвАҐвАҐвАҐвАҐвАҐ"
+                    placeholder="••••••••"
                     value={registerPassword}
                     onChange={(e) => setRegisterPassword(e.target.value)}
                     required
                     minLength={6}
                   />
                   <p className="text-xs text-muted-foreground">
-                    –Ь–Є–љ–Є–Љ—Г–Љ 6 —Б–Є–Љ–≤–Њ–ї–Њ–≤
+                    Минимум 6 символов
                   </p>
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      –†–µ–≥–Є—Б—В—А–∞—Ж–Є—П...
+                      Регистрация...
                     </>
                   ) : (
-                    '–Ч–∞—А–µ–≥–Є—Б—В—А–Є—А–Њ–≤–∞—В—М—Б—П'
+                    'Зарегистрироваться'
                   )}
                 </Button>
               </form>
@@ -227,11 +227,10 @@ export default function Login() {
         </CardContent>
         <CardFooter className="flex justify-center">
           <p className="text-xs text-muted-foreground text-center">
-            –Я—А–Њ–і–Њ–ї–ґ–∞—П, –≤—Л —Б–Њ–≥–ї–∞—И–∞–µ—В–µ—Б—М —Б —Г—Б–ї–Њ–≤–Є—П–Љ–Є –Є—Б–њ–Њ–ї—М–Ј–Њ–≤–∞–љ–Є—П
+            Продолжая, вы соглашаетесь с условиями использования
           </p>
         </CardFooter>
       </Card>
     </div>
   );
 }
-
