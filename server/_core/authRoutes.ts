@@ -95,6 +95,11 @@ router.post('/login', (req, res, next) => {
         'Path=/'
       ].filter(Boolean).join('; ');
       
+      // Disable caching to prevent Cloudflare from stripping Set-Cookie header
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      
       res.setHeader('Set-Cookie', cookieValue);
       
       res.json({ success: true, user: { id: user.id, email: user.email, phone: user.phone, name: user.name } });
