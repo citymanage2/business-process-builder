@@ -95,6 +95,16 @@ router.post('/login', (req, res, next) => {
         'Path=/'
       ].filter(Boolean).join('; ');
       
+      // Debug logging
+      console.log('[AUTH] Setting cookie:', {
+        isProduction: ENV.isProduction,
+        NODE_ENV: process.env.NODE_ENV,
+        cookieValue: cookieValue.substring(0, 50) + '...', // Log first 50 chars
+        protocol: req.protocol,
+        secure: req.secure,
+        hostname: req.hostname
+      });
+      
       // Disable caching to prevent Cloudflare from stripping Set-Cookie header
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
       res.setHeader('Pragma', 'no-cache');
