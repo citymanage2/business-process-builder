@@ -19,7 +19,7 @@ export function configurePassport() {
   passport.use(
     new LocalStrategy(
       {
-        usernameField: 'email', // Can be email or phone
+        usernameField: 'identifier', // Frontend sends 'identifier' field
         passwordField: 'password',
       },
       async (emailOrPhone, password, done) => {

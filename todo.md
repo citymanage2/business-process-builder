@@ -434,4 +434,12 @@
 - [x] Проверить Console на JavaScript ошибки - нет ошибок
 - [x] Найти причину проблемы - cookie не устанавливается из-за secure: true без trust proxy
 - [x] Исправить - добавлен app.set('trust proxy', 1) в server/_core/index.ts
-- [ ] Задеплоить исправление на Render
+- [x] Задеплоить исправление на Render (commit ea203ff)
+
+## Проверка после деплоя trust proxy (10.12.2025)
+- [x] Открыть production сайт заново
+- [x] Попытаться войти снова - получена ошибка 401 "Missing credentials"
+- [x] Проверить установку cookie после входа - document.cookie = "" (пустая)
+- [x] Найти причину - Passport usernameField='email' но frontend отправляет 'identifier'
+- [x] Исправить - изменен usernameField на 'identifier' в auth.ts
+- [ ] Задеплоить исправление
