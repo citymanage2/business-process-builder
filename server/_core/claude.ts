@@ -118,21 +118,36 @@ export async function invokeClaudeStream(
 export async function invokeClaudeJSON<T = any>(options: ClaudeOptions): Promise<T> {
   const response = await invokeClaude({
     ...options,
-    systemPrompt: `${options.systemPrompt || ''}\n\nYou must respond with valid JSON only. Do not include any markdown formatting or explanations.`,
+    systemPrompt: `${options.systemPrompt || ''}
+
+IMPORTANT: You must respond with ONLY valid JSON. Do not include:
+- Markdown code blocks (no \`\`\`json or \`\`\`)
+- Any explanatory text before or after the JSON
+- Any comments or notes
+
+Respond with pure JSON starting with { or [`,
   });
 
   try {
     // Remove markdown code blocks if present
-    const cleanedResponse = response
+    let cleanedResponse = response
       .replace(/```json\n?/g, '')
       .replace(/```\n?/g, '')
       .trim();
 
+    // Find JSON object or array in the response
+    const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+    if (jsonMatch) {
+      cleanedResponse = jsonMatch[0];
+    }
+
     return JSON.parse(cleanedResponse);
   } catch (error) {
     console.error('[Claude API] JSON parsing error:', error);
-    console.error('[Claude API] Response:', response);
-    throw new Error('Failed to parse Claude response as JSON');
+    console.error('[Claude API] Raw response:', response);
+    console.error('[Claude API] Response length:', response.length);
+    console.error('[Claude API] First 500 chars:', response.substring(0, 500));
+    throw new Error(`Failed to parse Claude response as JSON: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
