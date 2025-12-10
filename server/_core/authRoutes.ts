@@ -90,7 +90,8 @@ router.post('/login', (req, res, next) => {
         httpOnly: true,
         secure: ENV.isProduction,
         maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-        sameSite: 'lax'
+        sameSite: ENV.isProduction ? 'none' : 'lax', // 'none' required for secure cookies through proxy
+        path: '/' // Explicitly set path
       });
       
       res.json({ success: true, user: { id: user.id, email: user.email, phone: user.phone, name: user.name } });
