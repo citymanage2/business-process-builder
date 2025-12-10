@@ -533,9 +533,17 @@
 - [x] Выявлена проблема: Claude требует streaming для операций > 10 минут
 - [x] Реализовать streaming для JSON генерации в invokeClaudeJSON
 - [x] Код генерации процесса автоматически использует streaming через invokeClaudeJSON
-- [ ] Протестировать генерацию
-- [ ] Выгрузить в GitHub и задеплоить на Render
+- [x] Сохранить checkpoint (c33cad2c)
+- [x] Выгрузить в GitHub (commit c33cad2)
+- [ ] Задеплоить на Render и протестировать
 
 ## Выгрузка изменений в GitHub (10.12.2025)
 - [x] Сделать git push в репозиторий citymanage2/business-process-builder (commit cbcebf4)
 - [ ] Проверить что изменения появились на GitHub
+
+## Упрощение промпта для укладывания в 32K токенов (10.12.2025)
+- [x] Проанализировать текущий промпт в prompts.ts
+- [x] Убрать избыточные разделы: stageDetails, crmFunnels (3 варианта), metrics
+- [x] Упростить структуру steps - убрать сложные объекты systems и documents
+- [ ] Протестировать генерацию
+- [ ] Выгрузить в GitHub и задеплоить на Render
