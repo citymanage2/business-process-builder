@@ -529,13 +529,13 @@
 - [ ] Протестировать генерацию процесса через веб-интерфейс
 - [ ] Задеплоить на Render
 
-## Проверка причины обрезания JSON даже с maxTokens=32768 (10.12.2025)
-- [ ] Проверить логи в /tmp/claude-response-*.json
-- [ ] Проверить stop_reason в ответе Claude API
-- [ ] Исправить проблему (возможно нужно использовать streaming или разбить на части)
+## Использование streaming API для длительных операций (10.12.2025)
+- [x] Выявлена проблема: Claude требует streaming для операций > 10 минут
+- [x] Реализовать streaming для JSON генерации в invokeClaudeJSON
+- [x] Код генерации процесса автоматически использует streaming через invokeClaudeJSON
 - [ ] Протестировать генерацию
-- [ ] Задеплоить на Render
+- [ ] Выгрузить в GitHub и задеплоить на Render
 
 ## Выгрузка изменений в GitHub (10.12.2025)
-- [ ] Сделать git push в репозиторий citymanage2/business-process-builder
+- [x] Сделать git push в репозиторий citymanage2/business-process-builder (commit cbcebf4)
 - [ ] Проверить что изменения появились на GitHub

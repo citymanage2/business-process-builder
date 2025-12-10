@@ -162,9 +162,12 @@ export async function invokeClaudeJSON<T = any>(options: ClaudeOptions): Promise
       // With structured outputs, the response is guaranteed to be valid JSON
       return JSON.parse(textContent.text);
     }
-
-    // Fallback to prompt-based JSON generation
-    const response = await invokeClaude({
+    
+    // Fallback: use streaming for long operations (>10 min)
+    // Use streaming for long operations (>10 min)
+    let response = '';
+    
+    await invokeClaudeStream({
       ...options,
       systemPrompt: `${systemPrompt || ''}
 
@@ -174,8 +177,10 @@ IMPORTANT: You must respond with ONLY valid JSON. Do not include:
 - Any comments or notes
 
 Respond with pure JSON starting with { or [`,
+    }, (chunk) => {
+      response += chunk;
     });
-
+    
     try {
       // Remove markdown code blocks if present
       let cleanedResponse = response
