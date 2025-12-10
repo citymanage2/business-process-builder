@@ -6,8 +6,10 @@
 import { Router } from 'express';
 import passport from 'passport';
 import { z } from 'zod';
+import jwt from 'jsonwebtoken';
 import { hashPassword } from './auth';
 import { createUser, getUserByEmail, getUserByPhone } from '../db';
+import { ENV } from './env';
 
 const router = Router();
 
@@ -75,6 +77,22 @@ router.post('/login', (req, res, next) => {
       if (err) {
         return res.status(500).json({ error: 'Login failed' });
       }
+      
+      // Create JWT token
+      const token = jwt.sign(
+        { userId: user.id, email: user.email },
+        ENV.cookieSecret,
+        { expiresIn: '30d' }
+      );
+      
+      // Set cookie
+      res.cookie('token', token, {
+        httpOnly: true,
+        secure: ENV.isProduction,
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+        sameSite: 'lax'
+      });
+      
       res.json({ success: true, user: { id: user.id, email: user.email, phone: user.phone, name: user.name } });
     });
   })(req, res, next);
