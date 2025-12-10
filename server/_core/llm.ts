@@ -188,11 +188,24 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     let content: string;
 
     if (jsonFormat) {
-      // Use JSON mode
+      // Extract JSON schema if provided
+      let jsonSchema: any = undefined;
+      const format = responseFormat || response_format || outputSchema || output_schema;
+      
+      if (format && typeof format === 'object') {
+        if ('json_schema' in format && format.json_schema) {
+          jsonSchema = format.json_schema.schema || format.json_schema;
+        } else if ('schema' in format) {
+          jsonSchema = format.schema;
+        }
+      }
+      
+      // Use JSON mode with optional schema
       const jsonResult = await invokeClaudeJSON({
         messages: claudeMessages,
         systemPrompt: system,
         maxTokens: maxTokensValue,
+        jsonSchema,
       });
       content = JSON.stringify(jsonResult);
     } else {

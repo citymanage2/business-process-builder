@@ -23,6 +23,7 @@ export interface ClaudeOptions {
   maxTokens?: number;
   temperature?: number;
   model?: string;
+  jsonSchema?: any; // JSON schema for structured outputs
 }
 
 /**
@@ -84,7 +85,7 @@ export async function invokeClaudeStream(
   } = options;
 
   try {
-    const stream = await anthropic.messages.stream({
+    const stream = await anthropic.messages.create({
       model,
       max_tokens: maxTokens,
       temperature,
@@ -93,32 +94,75 @@ export async function invokeClaudeStream(
         role: msg.role,
         content: msg.content,
       })),
+      stream: true,
     });
 
-    for await (const chunk of stream) {
-      if (
-        chunk.type === 'content_block_delta' &&
-        chunk.delta.type === 'text_delta'
-      ) {
-        onChunk(chunk.delta.text);
+    for await (const event of stream) {
+      if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+        onChunk(event.delta.text);
       }
     }
   } catch (error) {
     console.error('[Claude API] Streaming error:', error);
-    throw new Error(`Claude API streaming error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw new Error(`Claude streaming error: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
 /**
- * Generate structured JSON response using Claude
+ * Generate structured JSON response using Claude with guaranteed schema compliance
+ * Uses Claude's structured outputs feature (beta) for 100% valid JSON
  * 
- * @param options - Configuration for the Claude API call
- * @returns Parsed JSON object
+ * @param options - Configuration for the Claude API call with optional JSON schema
+ * @returns Parsed JSON object matching the schema
  */
 export async function invokeClaudeJSON<T = any>(options: ClaudeOptions): Promise<T> {
-  const response = await invokeClaude({
-    ...options,
-    systemPrompt: `${options.systemPrompt || ''}
+  const {
+    messages,
+    systemPrompt,
+    maxTokens = 4096,
+    temperature = 0.7,
+    model = 'claude-sonnet-4-5',
+    jsonSchema,
+  } = options;
+
+  try {
+    // Use structured outputs if schema is provided
+    if (jsonSchema) {
+      const response = await anthropic.messages.create({
+        model,
+        max_tokens: maxTokens,
+        temperature,
+        system: systemPrompt,
+        messages: messages.map(msg => ({
+          role: msg.role,
+          content: msg.content,
+        })),
+        // @ts-ignore - structured outputs beta feature
+        betas: ['structured-outputs-2025-11-13'],
+        // @ts-ignore
+        output_format: {
+          type: 'json_schema',
+          json_schema: {
+            name: 'response',
+            schema: jsonSchema,
+          },
+        },
+      });
+
+      // Extract text content from response
+      const textContent = response.content.find((block: any) => block.type === 'text');
+      if (!textContent || textContent.type !== 'text') {
+        throw new Error('No text content in Claude response');
+      }
+
+      // With structured outputs, the response is guaranteed to be valid JSON
+      return JSON.parse(textContent.text);
+    }
+
+    // Fallback to prompt-based JSON generation
+    const response = await invokeClaude({
+      ...options,
+      systemPrompt: `${systemPrompt || ''}
 
 IMPORTANT: You must respond with ONLY valid JSON. Do not include:
 - Markdown code blocks (no \`\`\`json or \`\`\`)
@@ -126,28 +170,40 @@ IMPORTANT: You must respond with ONLY valid JSON. Do not include:
 - Any comments or notes
 
 Respond with pure JSON starting with { or [`,
-  });
+    });
 
-  try {
-    // Remove markdown code blocks if present
-    let cleanedResponse = response
-      .replace(/```json\n?/g, '')
-      .replace(/```\n?/g, '')
-      .trim();
+    try {
+      // Remove markdown code blocks if present
+      let cleanedResponse = response
+        .replace(/```json\n?/g, '')
+        .replace(/```\n?/g, '')
+        .trim();
 
-    // Find JSON object or array in the response
-    const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
-    if (jsonMatch) {
-      cleanedResponse = jsonMatch[0];
+      // Find JSON object or array in the response
+      const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+      if (jsonMatch) {
+        cleanedResponse = jsonMatch[0];
+      }
+
+      return JSON.parse(cleanedResponse);
+    } catch (error) {
+      console.error('[Claude API] JSON parsing error:', error);
+      console.error('[Claude API] Raw response:', response);
+      console.error('[Claude API] Response length:', response.length);
+      console.error('[Claude API] First 500 chars:', response.substring(0, 500));
+      
+      // Save response to file for debugging
+      const fs = await import('fs/promises');
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `/tmp/claude-response-${timestamp}.json`;
+      await fs.writeFile(filename, response, 'utf-8');
+      console.error(`[Claude API] Full response saved to: ${filename}`);
+      
+      throw new Error(`Failed to parse Claude response as JSON: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-
-    return JSON.parse(cleanedResponse);
   } catch (error) {
-    console.error('[Claude API] JSON parsing error:', error);
-    console.error('[Claude API] Raw response:', response);
-    console.error('[Claude API] Response length:', response.length);
-    console.error('[Claude API] First 500 chars:', response.substring(0, 500));
-    throw new Error(`Failed to parse Claude response as JSON: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    console.error('[Claude API] Error:', error);
+    throw error;
   }
 }
 
@@ -163,20 +219,5 @@ export function estimateTokens(text: string): number {
  * Validate Claude API key
  */
 export function validateClaudeAPIKey(): boolean {
-  if (!process.env.CLAUDE_API_KEY) {
-    console.error('[Claude API] CLAUDE_API_KEY environment variable is not set');
-    return false;
-  }
-  
-  if (!process.env.CLAUDE_API_KEY.startsWith('sk-ant-')) {
-    console.error('[Claude API] Invalid CLAUDE_API_KEY format');
-    return false;
-  }
-
-  return true;
-}
-
-// Validate on module load
-if (process.env.NODE_ENV === 'production') {
-  validateClaudeAPIKey();
+  return !!process.env.CLAUDE_API_KEY;
 }

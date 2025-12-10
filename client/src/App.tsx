@@ -8,7 +8,7 @@ import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
-import Login from "./pages/Login";
+import Login from "./pages/Login.tsx";
 import FAQ from "./pages/FAQ";
 import Companies from "./pages/Companies";
 import InterviewChoice from "./pages/InterviewChoice";
