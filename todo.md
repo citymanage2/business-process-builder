@@ -459,4 +459,13 @@
 - [x] Найти причину - cookie не устанавливается из-за sameSite: 'lax' с secure: true через proxy
 - [x] Исправить проблему - изменен sameSite на 'none' для production
 - [x] Протестировать локально - РАБОТАЕТ!
+- [x] Задеплоить на production (commit 7a662fc)
+
+## Углубленная диагностика - все еще не работает (10.12.2025)
+- [x] Проверить что деплой завершился на Render - завершился
+- [x] Войти на production и проверить Network tab - Set-Cookie header: null!
+- [x] Проверить Set-Cookie заголовки в ответе - не приходит!
+- [x] Найти корневую причину - Cloudflare proxy удаляет Set-Cookie заголовки от res.cookie()
+- [x] Реализовать финальное решение - заменить res.cookie() на res.setHeader('Set-Cookie')
+- [x] Протестировать локально - РАБОТАЕТ!
 - [ ] Задеплоить на production

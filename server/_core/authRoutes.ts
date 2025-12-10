@@ -85,14 +85,17 @@ router.post('/login', (req, res, next) => {
         { expiresIn: '30d' }
       );
       
-      // Set cookie
-      res.cookie('token', token, {
-        httpOnly: true,
-        secure: ENV.isProduction,
-        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-        sameSite: ENV.isProduction ? 'none' : 'lax', // 'none' required for secure cookies through proxy
-        path: '/' // Explicitly set path
-      });
+      // Set cookie using setHeader instead of res.cookie() to avoid Cloudflare proxy issues
+      const cookieValue = [
+        `token=${token}`,
+        'HttpOnly',
+        ENV.isProduction ? 'Secure' : '',
+        `Max-Age=${30 * 24 * 60 * 60}`, // 30 days in seconds
+        `SameSite=${ENV.isProduction ? 'None' : 'Lax'}`,
+        'Path=/'
+      ].filter(Boolean).join('; ');
+      
+      res.setHeader('Set-Cookie', cookieValue);
       
       res.json({ success: true, user: { id: user.id, email: user.email, phone: user.phone, name: user.name } });
     });
