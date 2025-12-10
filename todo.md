@@ -490,4 +490,11 @@
 - [x] Найти несоответствие - context.ts использует JWT_SECRET, authRoutes.ts использует ENV.cookieSecret (SESSION_SECRET)
 - [x] Исправить - изменить context.ts чтобы использовал ENV.cookieSecret
 - [x] Протестировать локально - РАБОТАЕТ!
+- [x] Задеплоить на Render (commit 3e6089c)
+
+## Исправление Claude API ошибки 404 (10.12.2025)
+- [x] Найти где используется Claude API - claude.ts, llm.ts
+- [x] Проверить какая модель указана - claude-3-5-sonnet-20241022
+- [x] Исправить на актуальную модель - claude-3-5-sonnet-20240620
+- [ ] Протестировать локально
 - [ ] Задеплоить на Render
