@@ -480,9 +480,14 @@
 - [x] Задеплоить на production (commit 19a3644)
 
 ## Проверка Render-специфичных настроек (10.12.2025)
-- [ ] Проверить что используется HTTPS URL (не HTTP)
-- [ ] Проверить ENV.isProduction на Render
-- [ ] Проверить что NODE_ENV=production на Render
-- [ ] Проверить domain настройки cookie (должен быть .onrender.com или не указан)
-- [ ] Проверить что trust proxy правильно работает на Render
-- [ ] Найти и исправить проблему
+- [x] Проверить что используется HTTPS URL - ДА, protocol: 'https'
+- [x] Проверить ENV.isProduction на Render - ДА, isProduction: true
+- [x] Проверить что NODE_ENV=production на Render - ДА, NODE_ENV: 'production'
+- [x] Проверить domain настройки cookie - hostname: 'business-process-builder.onrender.com'
+- [x] Проверить что trust proxy правильно работает - ДА, secure: true
+- [x] Найти проблему - JsonWebTokenError: invalid signature!
+- [x] Проверить JWT_SECRET / SESSION_SECRET на Render - SESSION_SECRET установлен
+- [x] Найти несоответствие - context.ts использует JWT_SECRET, authRoutes.ts использует ENV.cookieSecret (SESSION_SECRET)
+- [x] Исправить - изменить context.ts чтобы использовал ENV.cookieSecret
+- [x] Протестировать локально - РАБОТАЕТ!
+- [ ] Задеплоить на Render

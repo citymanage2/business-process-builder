@@ -4,8 +4,7 @@ import jwt from 'jsonwebtoken';
 import { getDb } from '../db';
 import { users } from '../../drizzle/schema';
 import { eq } from 'drizzle-orm';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+import { ENV } from './env';
 
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
@@ -23,8 +22,8 @@ export async function createContext(
     const token = opts.req.cookies?.token;
 
     if (token) {
-      // Декодируем токен
-      const decoded = jwt.verify(token, JWT_SECRET) as { userId: number; email: string };
+      // Декодируем токен используя тот же секрет что и при создании
+      const decoded = jwt.verify(token, ENV.cookieSecret) as { userId: number; email: string };
       
       // ✅ ИСПРАВЛЕНО: Получаем db через getDb()
       const db = await getDb();
