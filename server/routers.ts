@@ -246,6 +246,7 @@ export const appRouter = router({
             { role: "user", content: prompt },
           ],
           response_format: { type: "json_object" },
+          maxTokens: 16384, // Increased to handle large process definitions
         });
 
         const content = typeof response.choices[0].message.content === 'string' 
