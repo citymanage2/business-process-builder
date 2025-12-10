@@ -33,9 +33,9 @@ export default function Login() {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include', // ✅ ДОБАВЛЕНО: Отправка cookie
+        credentials: 'include',
         body: JSON.stringify({ 
-          email: loginIdentifier, 
+          identifier: loginIdentifier,  // ✅ ИСПРАВЛЕНО: Отправляем 'identifier' вместо 'email'
           password: loginPassword 
         }),
       });

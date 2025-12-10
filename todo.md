@@ -442,4 +442,11 @@
 - [x] Проверить установку cookie после входа - document.cookie = "" (пустая)
 - [x] Найти причину - Passport usernameField='email' но frontend отправляет 'identifier'
 - [x] Исправить - изменен usernameField на 'identifier' в auth.ts
-- [ ] Задеплоить исправление
+- [x] Задеплоить исправление (commit 40b1b10)
+
+## Диагностика "Missing credentials" после исправления usernameField (10.12.2025)
+- [x] Проверить код Login.tsx - какие поля отправляются - нашел что отправляет 'email' вместо 'identifier'
+- [x] Найти причину проблемы - несоответствие между frontend (email) и backend (identifier)
+- [x] Исправить - изменен Login.tsx чтобы отправлял 'identifier'
+- [x] Протестировать локально - РАБОТАЕТ! Навигация обновляется после входа
+- [ ] Задеплоить на production
