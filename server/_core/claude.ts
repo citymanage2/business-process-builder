@@ -53,6 +53,10 @@ export async function invokeClaude(options: ClaudeOptions): Promise<string> {
       })),
     });
 
+    // Log usage statistics
+    console.log('[Claude API] Usage:', JSON.stringify(response.usage));
+    console.log('[Claude API] Stop reason:', response.stop_reason);
+    
     // Extract text content from response
     const textContent = response.content.find((block: any) => block.type === 'text');
     if (!textContent || textContent.type !== 'text') {
