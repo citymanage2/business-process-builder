@@ -208,7 +208,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     return {
       id: `claude-${Date.now()}`,
       created: Math.floor(Date.now() / 1000),
-      model: 'claude-3-5-sonnet-20240620',
+      model: 'claude-sonnet-4-5',
       choices: [
         {
           index: 0,

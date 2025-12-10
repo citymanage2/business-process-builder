@@ -37,7 +37,7 @@ export async function invokeClaude(options: ClaudeOptions): Promise<string> {
     systemPrompt,
     maxTokens = 4096,
     temperature = 0.7,
-    model = 'claude-3-5-sonnet-20240620', // Claude 3.5 Sonnet (stable version)
+    model = 'claude-sonnet-4-5', // Claude 4.5 Sonnet (latest)
   } = options;
 
   try {
@@ -80,7 +80,7 @@ export async function invokeClaudeStream(
     systemPrompt,
     maxTokens = 4096,
     temperature = 0.7,
-    model = 'claude-3-5-sonnet-20240620',
+    model = 'claude-sonnet-4-5',
   } = options;
 
   try {
