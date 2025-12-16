@@ -359,8 +359,17 @@ export default function ProcessDiagramSwimlane({ roles, stages, steps, title }: 
     setZoom(prev => Math.max(prev - 0.2, 0.5));
   };
 
-  const handleFitToScreen = () => {
-    setZoom(1);
+  const handleFullscreen = () => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    if (!document.fullscreenElement) {
+      container.requestFullscreen().catch(err => {
+        console.error('Error attempting to enable fullscreen:', err);
+      });
+    } else {
+      document.exitFullscreen();
+    }
   };
 
   return (
@@ -371,7 +380,7 @@ export default function ProcessDiagramSwimlane({ roles, stages, steps, title }: 
           <Button variant="outline" size="sm" onClick={handleZoomOut}>
             <ZoomOut className="w-4 h-4" />
           </Button>
-          <Button variant="outline" size="sm" onClick={handleFitToScreen}>
+          <Button variant="outline" size="sm" onClick={handleFullscreen}>
             <Maximize2 className="w-4 h-4" />
           </Button>
           <Button variant="outline" size="sm" onClick={handleZoomIn}>

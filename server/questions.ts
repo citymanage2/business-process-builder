@@ -7,7 +7,7 @@ export interface Question {
   id: string;
   block: string;
   text: string;
-  type: "text" | "textarea" | "select" | "multiselect" | "number" | "roles_table";
+  type: "text" | "textarea" | "select" | "multiselect" | "number";
   options?: string[];
   placeholder?: string;
   required: boolean;
@@ -244,9 +244,9 @@ export const FULL_QUESTIONS: Question[] = [
   {
     id: "D28",
     block: "D",
-    text: "Перечислите все ключевые роли и их зарплаты",
-    type: "roles_table",
-    placeholder: "Добавьте роли и укажите зарплату для каждой",
+    text: "Перечислите все ключевые роли/должности, которые участвуют в этом процессе (без ФИО)",
+    type: "textarea",
+    placeholder: "Например: Менеджер по продажам, Аккаунт-менеджер, Таргетолог, Креатор, Руководитель проекта...",
     required: true,
     isKeyQuestion: true,
   },
@@ -287,7 +287,15 @@ export const FULL_QUESTIONS: Question[] = [
     type: "textarea",
     required: false,
   },
-
+  {
+    id: "D34_salary",
+    block: "D",
+    text: "Укажите примерную зарплату для каждой роли (в рублях в месяц) для расчета стоимости процесса",
+    type: "textarea",
+    placeholder: "Например: Менеджер по продажам - 80000 руб, Аккаунт-менеджер - 70000 руб, Таргетолог - 60000 руб...",
+    required: true,
+    isKeyQuestion: true,
+  },
   {
     id: "D35_workload",
     block: "D",

@@ -205,22 +205,85 @@ export default function ProcessView() {
           </TabsContent>
 
           <TabsContent value="stages" className="mt-6">
-            <StageDetails
-              stages={process.stages || []}
-              stageDetails={process.stageDetails || []}
-            />
+            {(!process.stageDetails || process.stageDetails.length === 0) ? (
+              <Card>
+                <CardHeader className="text-center">
+                  <Sparkles className="w-12 h-12 mx-auto mb-4 text-primary" />
+                  <CardTitle>Детальное описание этапов еще не сгенерировано</CardTitle>
+                  <CardDescription>
+                    Нажмите кнопку ниже, чтобы ИИ создал подробное описание каждого этапа процесса
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex justify-center">
+                  <Button
+                    onClick={() => toast.info("Функция в разработке")}
+                    className="gap-2"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    Сгенерировать описание этапов
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <StageDetails
+                stages={process.stages || []}
+                stageDetails={process.stageDetails || []}
+              />
+            )}
           </TabsContent>
 
           <TabsContent value="metrics" className="mt-6">
-            <ProcessMetrics
-              totalTime={process.totalTime}
-              totalCost={process.totalCost}
-              salaryData={process.salaryData}
-            />
+            {(!process.totalTime && !process.totalCost) ? (
+              <Card>
+                <CardHeader className="text-center">
+                  <Target className="w-12 h-12 mx-auto mb-4 text-primary" />
+                  <CardTitle>Метрики процесса еще не рассчитаны</CardTitle>
+                  <CardDescription>
+                    Нажмите кнопку ниже, чтобы ИИ рассчитал время выполнения и стоимость процесса
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex justify-center">
+                  <Button
+                    onClick={() => toast.info("Функция в разработке")}
+                    className="gap-2"
+                  >
+                    <Target className="w-4 h-4" />
+                    Рассчитать метрики
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <ProcessMetrics
+                totalTime={process.totalTime}
+                totalCost={process.totalCost}
+                salaryData={process.salaryData}
+              />
+            )}
           </TabsContent>
 
           <TabsContent value="funnels" className="mt-6">
-            <CRMFunnels funnels={process.crmFunnels || []} />
+            {(!process.crmFunnels || process.crmFunnels.length === 0) ? (
+              <Card>
+                <CardHeader className="text-center">
+                  <TrendingUp className="w-12 h-12 mx-auto mb-4 text-primary" />
+                  <CardTitle>CRM воронки еще не созданы</CardTitle>
+                  <CardDescription>
+                    Нажмите кнопку ниже, чтобы ИИ создал воронки продаж для вашего процесса
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex justify-center">
+                  <Button
+                    onClick={() => toast.info("Функция в разработке")}
+                    className="gap-2"
+                  >
+                    <TrendingUp className="w-4 h-4" />
+                    Создать CRM воронки
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <CRMFunnels funnels={process.crmFunnels || []} />
+            )}
           </TabsContent>
 
           <TabsContent value="documents" className="mt-6">

@@ -25,15 +25,9 @@ export default function FormInterview() {
   const [uploadedFiles, setUploadedFiles] = useState<Array<{ name: string; url: string }>>([]);
 
   const questions = interviewType === "full" ? FULL_QUESTIONS : SHORT_QUESTIONS;
-  
-  // Фильтруем только те блоки, в которых есть вопросы для текущего типа анкеты
-  const availableBlocks = QUESTION_BLOCKS.filter(block => 
-    questions.some(q => q.block === block.id)
-  );
-  
-  const currentBlock = availableBlocks[currentBlockIndex];
+  const currentBlock = QUESTION_BLOCKS[currentBlockIndex];
   const currentBlockQuestions = questions.filter(q => q.block === currentBlock.id);
-  const totalBlocks = availableBlocks.length;
+  const totalBlocks = QUESTION_BLOCKS.length;
   const progress = ((currentBlockIndex + 1) / totalBlocks) * 100;
 
   const { data: company } = trpc.companies.get.useQuery({ id: companyId });
@@ -287,81 +281,6 @@ export default function FormInterview() {
             onChange={(e) => handleAnswerChange(question.id, e.target.value)}
             placeholder={question.placeholder}
           />
-        );
-
-      case "roles_table":
-        const roles = value ? JSON.parse(value) : [];
-        return (
-          <div className="space-y-4">
-            <div className="border rounded-lg overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-muted">
-                  <tr>
-                    <th className="text-left p-3 font-medium">Роль</th>
-                    <th className="text-left p-3 font-medium">Зарплата (руб/мес)</th>
-                    <th className="w-16"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {roles.map((role: { name: string; salary: string }, index: number) => (
-                    <tr key={index} className="border-t">
-                      <td className="p-2">
-                        <Input
-                          value={role.name}
-                          onChange={(e) => {
-                            const updated = [...roles];
-                            updated[index].name = e.target.value;
-                            handleAnswerChange(question.id, JSON.stringify(updated));
-                          }}
-                          placeholder="Например: Менеджер по продажам"
-                        />
-                      </td>
-                      <td className="p-2">
-                        <Input
-                          type="number"
-                          value={role.salary}
-                          onChange={(e) => {
-                            const updated = [...roles];
-                            updated[index].salary = e.target.value;
-                            handleAnswerChange(question.id, JSON.stringify(updated));
-                          }}
-                          placeholder="80000"
-                        />
-                      </td>
-                      <td className="p-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            const updated = roles.filter((_: any, i: number) => i !== index);
-                            handleAnswerChange(question.id, JSON.stringify(updated));
-                          }}
-                        >
-                          ×
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                const updated = [...roles, { name: "", salary: "" }];
-                handleAnswerChange(question.id, JSON.stringify(updated));
-              }}
-            >
-              + Добавить роль
-            </Button>
-            {question.placeholder && (
-              <p className="text-sm text-muted-foreground select-text">
-                <span className="font-medium">Пример:</span> Менеджер по продажам - 80000 руб, Аккаунт-менеджер - 70000 руб
-              </p>
-            )}
-          </div>
         );
 
       default:
