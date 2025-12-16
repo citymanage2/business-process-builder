@@ -25,9 +25,15 @@ export default function FormInterview() {
   const [uploadedFiles, setUploadedFiles] = useState<Array<{ name: string; url: string }>>([]);
 
   const questions = interviewType === "full" ? FULL_QUESTIONS : SHORT_QUESTIONS;
-  const currentBlock = QUESTION_BLOCKS[currentBlockIndex];
+  
+  // Фильтруем только те блоки, в которых есть вопросы для текущего типа анкеты
+  const availableBlocks = QUESTION_BLOCKS.filter(block => 
+    questions.some(q => q.block === block.id)
+  );
+  
+  const currentBlock = availableBlocks[currentBlockIndex];
   const currentBlockQuestions = questions.filter(q => q.block === currentBlock.id);
-  const totalBlocks = QUESTION_BLOCKS.length;
+  const totalBlocks = availableBlocks.length;
   const progress = ((currentBlockIndex + 1) / totalBlocks) * 100;
 
   const { data: company } = trpc.companies.get.useQuery({ id: companyId });
