@@ -410,10 +410,24 @@ export default function FormInterview() {
         <CardContent className="space-y-6">
           {currentBlockQuestions.map((question) => (
             <div key={question.id} className="space-y-2">
-              <Label className="text-base">
-                {question.text}
-                {question.required && <span className="text-destructive ml-1">*</span>}
-              </Label>
+              <div className="flex items-start justify-between gap-4">
+                <Label className="text-base flex-1">
+                  {question.text}
+                  {question.required && <span className="text-destructive ml-1">*</span>}
+                  {!question.required && <span className="text-muted-foreground ml-1 text-sm font-normal">(необязательно)</span>}
+                </Label>
+                {!question.required && answers[question.id] && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleAnswerChange(question.id, "")}
+                    className="shrink-0"
+                  >
+                    Пропустить
+                  </Button>
+                )}
+              </div>
               {renderQuestion(question)}
             </div>
           ))}
