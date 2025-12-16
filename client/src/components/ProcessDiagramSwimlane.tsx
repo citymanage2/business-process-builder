@@ -263,20 +263,50 @@ export default function ProcessDiagramSwimlane({ roles, stages, steps, title }: 
         const toPos = stepPositions[nextStepId];
         if (!toPos) return;
         
-        // Рисуем стрелку от правого края текущего блока к левому краю следующего
-        const fromX = fromPos.x + fromPos.width;
-        const fromY = fromPos.y + fromPos.height / 2;
-        const toX = toPos.x;
-        const toY = toPos.y + toPos.height / 2;
+        // Определяем направление стрелки
+        const sameRow = Math.abs(fromPos.y - toPos.y) < 10;
+        const sameCol = Math.abs(fromPos.x - toPos.x) < 10;
+        
+        let fromX, fromY, toX, toY;
+        
+        if (sameRow) {
+          // Горизонтальная стрелка (блоки в одной роли)
+          fromX = fromPos.x + fromPos.width;
+          fromY = fromPos.y + fromPos.height / 2;
+          toX = toPos.x;
+          toY = toPos.y + toPos.height / 2;
+        } else if (sameCol) {
+          // Вертикальная стрелка (блоки в одном этапе)
+          fromX = fromPos.x + fromPos.width / 2;
+          fromY = fromPos.y + fromPos.height;
+          toX = toPos.x + toPos.width / 2;
+          toY = toPos.y;
+        } else if (toPos.x > fromPos.x) {
+          // Диагональная стрелка вправо-вниз или вправо-вверх
+          fromX = fromPos.x + fromPos.width;
+          fromY = fromPos.y + fromPos.height / 2;
+          toX = toPos.x;
+          toY = toPos.y + toPos.height / 2;
+        } else {
+          // Диагональная стрелка влево-вниз или влево-вверх
+          fromX = fromPos.x;
+          fromY = fromPos.y + fromPos.height / 2;
+          toX = toPos.x + toPos.width;
+          toY = toPos.y + toPos.height / 2;
+        }
         
         ctx.beginPath();
         ctx.moveTo(fromX, fromY);
         
-        // Если блоки на одной линии - прямая стрелка
-        if (Math.abs(fromY - toY) < 10) {
+        // Рисуем ломаную линию
+        if (sameRow) {
+          // Прямая горизонтальная линия
+          ctx.lineTo(toX, toY);
+        } else if (sameCol) {
+          // Прямая вертикальная линия
           ctx.lineTo(toX, toY);
         } else {
-          // Иначе - ломаная линия
+          // Ломаная линия для диагональных связей
           const midX = (fromX + toX) / 2;
           ctx.lineTo(midX, fromY);
           ctx.lineTo(midX, toY);
@@ -285,12 +315,33 @@ export default function ProcessDiagramSwimlane({ roles, stages, steps, title }: 
         
         ctx.stroke();
         
-        // Стрелка
+        // Рисуем стрелку на конце
         ctx.setLineDash([]);
         ctx.beginPath();
-        ctx.moveTo(toX, toY);
-        ctx.lineTo(toX - 8, toY - 5);
-        ctx.lineTo(toX - 8, toY + 5);
+        
+        if (sameRow) {
+          // Горизонтальная стрелка
+          ctx.moveTo(toX, toY);
+          ctx.lineTo(toX - 8, toY - 5);
+          ctx.lineTo(toX - 8, toY + 5);
+        } else if (sameCol) {
+          // Вертикальная стрелка
+          ctx.moveTo(toX, toY);
+          ctx.lineTo(toX - 5, toY - 8);
+          ctx.lineTo(toX + 5, toY - 8);
+        } else {
+          // Диагональная стрелка
+          if (toPos.x > fromPos.x) {
+            ctx.moveTo(toX, toY);
+            ctx.lineTo(toX - 8, toY - 5);
+            ctx.lineTo(toX - 8, toY + 5);
+          } else {
+            ctx.moveTo(toX, toY);
+            ctx.lineTo(toX + 8, toY - 5);
+            ctx.lineTo(toX + 8, toY + 5);
+          }
+        }
+        
         ctx.closePath();
         ctx.fillStyle = "#666";
         ctx.fill();
