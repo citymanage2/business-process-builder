@@ -13,6 +13,24 @@ import { ENV } from './env';
 
 const router = Router();
 
+// Test route
+router.get('/test', (req, res) => {
+  res.json({ message: 'Auth routes work!' });
+});
+
+router.post('/test-post', (req, res) => {
+  res.json({ message: 'POST works!', body: req.body });
+});
+
+router.get('/test-db', async (req, res) => {
+  try {
+    const user = await getUserByEmail('test@example.com');
+    res.json({ message: 'DB works!', user: user ? 'found' : 'not found' });
+  } catch (error) {
+    res.status(500).json({ error: String(error) });
+  }
+});
+
 // Register with email/phone/password
 router.post('/register', async (req, res) => {
   try {
@@ -65,56 +83,95 @@ router.post('/register', async (req, res) => {
 });
 
 // Login with email/phone + password
-router.post('/login', (req, res, next) => {
-  passport.authenticate('local', (err: any, user: any, info: any) => {
-    if (err) {
-      return res.status(500).json({ error: 'Authentication error' });
+router.post('/login', async (req, res) => {
+  try {
+    console.log('[Auth] Login request received:', req.body);
+    
+    const { identifier, password } = req.body;
+    
+    if (!identifier || !password) {
+      console.log('[Auth] Missing identifier or password');
+      return res.status(400).json({ error: 'Email/phone and password are required' });
     }
+    
+    console.log('[Auth] Looking up user by identifier:', identifier);
+    
+    // Try to find user by email or phone
+    let user = await getUserByEmail(identifier);
+    console.log('[Auth] getUserByEmail result:', user ? 'found' : 'not found');
+    
     if (!user) {
-      return res.status(401).json({ error: info?.message || 'Invalid credentials' });
+      user = await getUserByPhone(identifier);
+      console.log('[Auth] getUserByPhone result:', user ? 'found' : 'not found');
     }
-    req.login(user, (err) => {
-      if (err) {
-        return res.status(500).json({ error: 'Login failed' });
-      }
-      
-      // Create JWT token
-      const token = jwt.sign(
-        { userId: user.id, email: user.email },
-        ENV.cookieSecret,
-        { expiresIn: '30d' }
-      );
-      
-      // Set cookie using setHeader instead of res.cookie() to avoid Cloudflare proxy issues
-      const cookieValue = [
-        `token=${token}`,
-        'HttpOnly',
-        ENV.isProduction ? 'Secure' : '',
-        `Max-Age=${30 * 24 * 60 * 60}`, // 30 days in seconds
-        `SameSite=${ENV.isProduction ? 'None' : 'Lax'}`,
-        'Path=/'
-      ].filter(Boolean).join('; ');
-      
-      // Debug logging
-      console.log('[AUTH] Setting cookie:', {
-        isProduction: ENV.isProduction,
-        NODE_ENV: process.env.NODE_ENV,
-        cookieValue: cookieValue.substring(0, 50) + '...', // Log first 50 chars
-        protocol: req.protocol,
-        secure: req.secure,
-        hostname: req.hostname
-      });
-      
-      // Disable caching to prevent Cloudflare from stripping Set-Cookie header
-      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-      res.setHeader('Pragma', 'no-cache');
-      res.setHeader('Expires', '0');
-      
-      res.setHeader('Set-Cookie', cookieValue);
-      
-      res.json({ success: true, user: { id: user.id, email: user.email, phone: user.phone, name: user.name } });
+    
+    if (!user) {
+      console.log('[Auth] User not found');
+      return res.status(401).json({ error: 'Неверный email/телефон или пароль' });
+    }
+    
+    console.log('[Auth] User found:', { id: user.id, email: user.email, hasPassword: !!user.passwordHash });
+    
+    if (!user.passwordHash) {
+      return res.status(401).json({ error: 'Используйте вход через Google' });
+    }
+    
+    // Verify password
+    console.log('[Auth] Verifying password...');
+    console.log('[Auth] Password from request:', password);
+    console.log('[Auth] Password hash from DB:', user.passwordHash);
+    
+    const bcrypt = await import('bcryptjs');
+    const isValid = await bcrypt.compare(password, user.passwordHash);
+    
+    console.log('[Auth] Password valid:', isValid);
+    
+    if (!isValid) {
+      console.log('[Auth] Password verification failed');
+      return res.status(401).json({ error: 'Неверный email/телефон или пароль' });
+    }
+    
+    console.log('[Auth] Password verified successfully');
+    
+    // Create JWT token
+    const token = jwt.sign(
+      { userId: user.id, email: user.email },
+      ENV.cookieSecret,
+      { expiresIn: '30d' }
+    );
+    
+    // Set cookie
+    const cookieValue = [
+      `token=${token}`,
+      'HttpOnly',
+      ENV.isProduction ? 'Secure' : '',
+      `Max-Age=${30 * 24 * 60 * 60}`,
+      `SameSite=${ENV.isProduction ? 'None' : 'Lax'}`,
+      'Path=/'
+    ].filter(Boolean).join('; ');
+    
+    console.log('[Auth] Login successful, setting cookie');
+    
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Set-Cookie', cookieValue);
+    
+    res.json({ 
+      success: true, 
+      user: { 
+        id: user.id, 
+        email: user.email, 
+        phone: user.phone, 
+        name: user.name,
+        role: user.role,
+        tokenBalance: user.tokenBalance
+      } 
     });
-  })(req, res, next);
+  } catch (error) {
+    console.error('[Auth] Login error:', error);
+    res.status(500).json({ error: 'Login failed' });
+  }
 });
 
 // Logout

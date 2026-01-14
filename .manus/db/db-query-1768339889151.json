@@ -1,0 +1,9 @@
+{
+  "query": "INSERT INTO users (email, passwordHash, name, provider, role, tokenBalance, createdAt, updatedAt, lastSignedIn) \nVALUES ('test@example.com', '$2b$10$pLkpw4hpHjGb0wZ0hjbFYeGvxfDba9UrYLK1aESwYrXl8CM9kjKPu', 'Test User', 'local', 'user', 1000, NOW(), NOW(), NOW())\nON DUPLICATE KEY UPDATE email = email;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2caBidRtXS3CBxe.9f9b2212b9bd --database AtkYmgPLTEDMC5w2gAV6C3 --execute INSERT INTO users (email, passwordHash, name, provider, role, tokenBalance, createdAt, updatedAt, lastSignedIn) \nVALUES ('test@example.com', '$2b$10$pLkpw4hpHjGb0wZ0hjbFYeGvxfDba9UrYLK1aESwYrXl8CM9kjKPu', 'Test User', 'local', 'user', 1000, NOW(), NOW(), NOW())\nON DUPLICATE KEY UPDATE email = email;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 64
+}

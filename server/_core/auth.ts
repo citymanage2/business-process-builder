@@ -24,31 +24,43 @@ export function configurePassport() {
       },
       async (emailOrPhone, password, done) => {
         try {
+          console.log('[Auth] Login attempt:', emailOrPhone);
+          
           // Try to find user by email or phone
           let user = await getUserByEmail(emailOrPhone);
+          console.log('[Auth] getUserByEmail result:', user ? 'found' : 'not found');
           
           if (!user) {
             user = await getUserByPhone(emailOrPhone);
+            console.log('[Auth] getUserByPhone result:', user ? 'found' : 'not found');
           }
 
           if (!user) {
+            console.log('[Auth] User not found');
             return done(null, false, { message: 'Неверный email/телефон или пароль' });
           }
 
           if (!user.passwordHash) {
+            console.log('[Auth] User has no password hash');
             return done(null, false, { message: 'Используйте вход через Google' });
           }
 
+          console.log('[Auth] Comparing password...');
           const isValid = await bcrypt.compare(password, user.passwordHash);
+          console.log('[Auth] Password valid:', isValid);
 
           if (!isValid) {
             return done(null, false, { message: 'Неверный email/телефон или пароль' });
           }
 
-          await updateUserLastSignIn(user.id);
+          console.log('[Auth] Updating last sign in...');
+          // Temporarily skip updating lastSignedIn to debug
+          // await updateUserLastSignIn(user.id);
+          console.log('[Auth] Login successful');
 
           return done(null, user);
         } catch (error) {
+          console.error('[Auth] Login error:', error);
           return done(error as Error);
         }
       }

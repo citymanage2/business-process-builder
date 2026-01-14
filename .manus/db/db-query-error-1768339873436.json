@@ -1,0 +1,8 @@
+{
+  "query": "INSERT INTO users (email, password_hash, name, provider, role, token_balance, created_at, updated_at, last_signed_in) \nVALUES ('test@example.com', '$2b$10$pLkpw4hpHjGb0wZ0hjbFYeGvxfDba9UrYLK1aESwYrXl8CM9kjKPu', 'Test User', 'local', 'user', 1000, NOW(), NOW(), NOW())\nON CONFLICT (email) DO NOTHING;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2caBidRtXS3CBxe.9f9b2212b9bd --database AtkYmgPLTEDMC5w2gAV6C3 --execute INSERT INTO users (email, password_hash, name, provider, role, token_balance, created_at, updated_at, last_signed_in) \nVALUES ('test@example.com', '$2b$10$pLkpw4hpHjGb0wZ0hjbFYeGvxfDba9UrYLK1aESwYrXl8CM9kjKPu', 'Test User', 'local', 'user', 1000, NOW(), NOW(), NOW())\nON CONFLICT (email) DO NOTHING;",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1064 (42000) at line 1: You have an error in your SQL syntax; check the manual that corresponds to your TiDB version for the right syntax to use line 3 column 12 near \"CONFLICT (email) DO NOTHING\""
+  ]
+}
