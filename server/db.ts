@@ -76,6 +76,27 @@ export async function closePool() {
   }
 }
 
+// Get connection pool metrics for monitoring
+export function getPoolMetrics() {
+  if (!pool) {
+    return {
+      totalConnections: 0,
+      idleConnections: 0,
+      waitingRequests: 0,
+      maxConnections: 0,
+      status: 'not_initialized'
+    };
+  }
+
+  return {
+    totalConnections: pool.totalCount,
+    idleConnections: pool.idleCount,
+    waitingRequests: pool.waitingCount,
+    maxConnections: pool.options.max || 20,
+    status: 'active'
+  };
+}
+
 export async function createUser(data: { email?: string; phone?: string; name?: string; provider?: string; providerId?: string; passwordHash?: string }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");

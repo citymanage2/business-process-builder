@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { Users, DollarSign, AlertCircle, Loader2, Edit, Home, MessageCircle } from "lucide-react";
+import { Users, DollarSign, AlertCircle, Loader2, Edit, Home, MessageCircle, Database } from "lucide-react";
+import DatabaseMonitor from "@/components/DatabaseMonitor";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 
@@ -143,8 +144,12 @@ export default function Admin() {
         {/* Tabs */}
         <Tabs defaultValue="users" className="w-full">
           <div className="flex items-center justify-between mb-6">
-            <TabsList className="grid w-full grid-cols-2 max-w-md">
+            <TabsList className="grid w-full grid-cols-3 max-w-2xl">
               <TabsTrigger value="users">Пользователи</TabsTrigger>
+              <TabsTrigger value="database">
+                <Database className="w-4 h-4 mr-2" />
+                База данных
+              </TabsTrigger>
               <TabsTrigger value="logs">Логи ошибок</TabsTrigger>
             </TabsList>
             <Link href="/admin/support">
@@ -214,6 +219,11 @@ export default function Admin() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Database Monitoring */}
+          <TabsContent value="database" className="mt-6">
+            <DatabaseMonitor />
           </TabsContent>
 
           {/* Таблица логов ошибок */}

@@ -553,6 +553,16 @@ export const appRouter = router({
 
   // Admin router - только для администраторов
   admin: router({
+    // Получить метрики пула подключений к БД
+    getPoolMetrics: protectedProcedure
+      .query(async ({ ctx }) => {
+        if (ctx.user.role !== 'admin') {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+        }
+        const { getPoolMetrics } = await import('./db');
+        return getPoolMetrics();
+      }),
+
     // Получить список всех пользователей
     getAllUsers: protectedProcedure
       .query(async ({ ctx }) => {
