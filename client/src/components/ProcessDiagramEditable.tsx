@@ -11,6 +11,7 @@ import {
   useDraggable,
 } from "@dnd-kit/core";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Save } from "lucide-react";
 import { toast } from "sonner";
 
@@ -74,16 +75,27 @@ export default function ProcessDiagramEditable({ steps: initialSteps, roles, sta
 
     // Парсим ID для определения новой позиции
     const overId = over.id as string;
-    const [newRoleId, newStageId] = overId.split("_");
+    const parts = overId.split("_");
+    
+    // Проверяем что это валидный drop target (roleId_stageId)
+    if (parts.length !== 2) {
+      console.error("Invalid drop target ID:", overId);
+      setActiveId(null);
+      return;
+    }
+    
+    const [newRoleId, newStageId] = parts;
 
     // Обновляем шаг
-    setSteps((prevSteps) =>
-      prevSteps.map((step) =>
+    setSteps((prevSteps) => {
+      const updatedSteps = prevSteps.map((step) =>
         step.id === active.id
           ? { ...step, roleId: newRoleId, stageId: newStageId }
           : step
-      )
-    );
+      );
+      console.log("Steps updated:", updatedSteps);
+      return updatedSteps;
+    });
 
     setActiveId(null);
     toast.success("Элемент перемещен");
@@ -241,26 +253,45 @@ function DraggableStep({
       }
     : undefined;
 
+  const truncatedDescription = step.description && step.description.length > 80 
+    ? step.description.substring(0, 80) + "..." 
+    : step.description;
+
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...listeners}
-      {...attributes}
-      className={`p-3 rounded-lg border-2 ${getStepColor(step.type)} cursor-grab ${
-        isDragging ? "opacity-50" : ""
-      }`}
-    >
-      <div className="font-semibold text-sm mb-1">{step.name}</div>
-      {step.description && (
-        <div className="text-xs text-gray-700 mb-2">{step.description.substring(0, 80)}...</div>
-      )}
-      {step.duration && (
-        <div className="text-xs text-gray-600 flex items-center gap-1">
-          <span>⏱</span> {step.duration}
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div
+          ref={setNodeRef}
+          style={style}
+          {...listeners}
+          {...attributes}
+          className={`p-3 rounded-lg border-2 ${getStepColor(step.type)} cursor-grab ${
+            isDragging ? "opacity-50" : ""
+          }`}
+        >
+          <div className="font-semibold text-sm mb-1">{step.name}</div>
+          {step.description && (
+            <div className="text-xs text-gray-700 mb-2">{truncatedDescription}</div>
+          )}
+          {step.duration && (
+            <div className="text-xs text-gray-600 flex items-center gap-1">
+              <span>⏱</span> {step.duration}
+            </div>
+          )}
         </div>
+      </TooltipTrigger>
+      {step.description && step.description.length > 80 && (
+        <TooltipContent className="max-w-md p-4">
+          <div className="space-y-2">
+            <div className="font-semibold">{step.name}</div>
+            <div className="text-sm">{step.description}</div>
+            {step.duration && (
+              <div className="text-xs text-muted-foreground">Длительность: {step.duration}</div>
+            )}
+          </div>
+        </TooltipContent>
       )}
-    </div>
+    </Tooltip>
   );
 }
 

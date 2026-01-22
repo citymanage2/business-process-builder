@@ -344,10 +344,21 @@ export const appRouter = router({
         title: z.string().optional(),
         description: z.string().optional(),
         status: z.enum(["draft", "in_review", "approved"]).optional(),
+        steps: z.array(z.any()).optional(), // Массив шагов процесса
       }))
       .mutation(async ({ input }) => {
-        const { id, ...data } = input;
-        await updateBusinessProcess(id, data);
+        const { id, steps, ...data } = input;
+        
+        // Если есть steps, сериализуем их в JSON
+        if (steps) {
+          await updateBusinessProcess(id, {
+            ...data,
+            steps: JSON.stringify(steps),
+          });
+        } else {
+          await updateBusinessProcess(id, data);
+        }
+        
         return { success: true };
       }),
     delete: protectedProcedure

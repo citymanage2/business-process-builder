@@ -22,7 +22,18 @@ export default function ProcessView() {
   const processId = params?.id ? parseInt(params.id) : 0;
   const [editMode, setEditMode] = useState(false);
 
-  const { data: process, isLoading } = trpc.processes.get.useQuery({ id: processId });
+  const { data: process, isLoading, refetch } = trpc.processes.get.useQuery({ id: processId });
+  
+  const updateProcessMutation = trpc.processes.update.useMutation({
+    onSuccess: () => {
+      toast.success("Изменения сохранены");
+      refetch();
+      setEditMode(false);
+    },
+    onError: (error) => {
+      toast.error(`Ошибка сохранения: ${error.message}`);
+    },
+  });
 
   const recommendationsQuery = trpc.recommendations.list.useQuery({ processId });
 
@@ -188,8 +199,10 @@ export default function ProcessView() {
                     roles={process.roles || []}
                     stages={process.stages || []}
                     onSave={(updatedSteps) => {
-                      console.log("Сохранение изменений:", updatedSteps);
-                      // TODO: Добавить mutation для сохранения
+                      updateProcessMutation.mutate({
+                        id: processId,
+                        steps: updatedSteps,
+                      });
                     }}
                   />
                 ) : (
