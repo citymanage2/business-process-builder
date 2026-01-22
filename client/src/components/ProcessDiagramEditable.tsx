@@ -186,7 +186,7 @@ export default function ProcessDiagramEditable({ steps: initialSteps, roles, sta
                 {/* Ячейки для каждого этапа */}
                 {stages.map((stage) => {
                   const cellSteps = getStepsByRoleAndStage(role.id, stage.id);
-                  const dropId = `${role.id}_${stage.id}`;
+                  const dropId = `role_${role.id}_stage_${stage.id}`;
 
                   return (
                     <DroppableCell
