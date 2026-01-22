@@ -39,8 +39,10 @@ const MAX_WIDTH = 480;
 
 export default function DashboardLayout({
   children,
+  noPadding = false,
 }: {
   children: React.ReactNode;
+  noPadding?: boolean;
 }) {
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
@@ -99,7 +101,7 @@ export default function DashboardLayout({
         } as CSSProperties
       }
     >
-      <DashboardLayoutContent setSidebarWidth={setSidebarWidth}>
+      <DashboardLayoutContent setSidebarWidth={setSidebarWidth} noPadding={noPadding}>
         {children}
       </DashboardLayoutContent>
     </SidebarProvider>
@@ -109,11 +111,13 @@ export default function DashboardLayout({
 type DashboardLayoutContentProps = {
   children: React.ReactNode;
   setSidebarWidth: (width: number) => void;
+  noPadding?: boolean;
 };
 
 function DashboardLayoutContent({
   children,
   setSidebarWidth,
+  noPadding = false,
 }: DashboardLayoutContentProps) {
   const { user, logout } = useAuth();
   const [location, setLocation] = useLocation();
@@ -286,7 +290,7 @@ function DashboardLayoutContent({
             </div>
           </div>
         )}
-        <main className="flex-1 p-4">{children}</main>
+        <main className={`flex-1 ${noPadding ? '' : 'p-4'}`}>{children}</main>
       </SidebarInset>
     </>
   );
