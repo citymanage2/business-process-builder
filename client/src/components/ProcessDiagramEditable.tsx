@@ -80,16 +80,18 @@ export default function ProcessDiagramEditable({ steps: initialSteps, roles, sta
 
     // Парсим ID для определения новой позиции
     const overId = over.id as string;
-    const parts = overId.split("_");
+    // Парсим ID цели (формат: "role_X_stage_Y")
+    const roleMatch = overId.match(/role_(\d+)/);
+    const stageMatch = overId.match(/stage_(\d+)/);
     
-    // Проверяем что это валидный drop target (roleId_stageId)
-    if (parts.length !== 2) {
+    if (!roleMatch || !stageMatch) {
       console.error("Invalid drop target ID:", overId);
       setActiveId(null);
       return;
     }
     
-    const [newRoleId, newStageId] = parts;
+    const newRoleId = roleMatch[1];
+    const newStageId = stageMatch[1];
 
     // Обновляем шаг и сохраняем в БД
     setSteps((prevSteps) => {

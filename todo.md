@@ -620,3 +620,8 @@
 - [x] Изменения не сохраняются в базу данных
 - [x] Проверить работу mutation processes.update
 - [x] Проверить вызов onSave в handleDragEnd - добавлен автоматический вызов onSave
+
+## Критический баг: Валидация ID в drag and drop (23.01.2026)
+- [x] Ошибка "Invalid drop target ID: role_2_stage_1" при попытке перетащить блок
+- [x] Валидация ID отклоняет правильные ID формата "role_X_stage_Y"
+- [x] Исправить логику валидации в handleDragEnd - использовать regex вместо split
