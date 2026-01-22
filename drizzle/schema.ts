@@ -1,4 +1,4 @@
-import { integer, pgEnum, pgTable, text, timestamp, varchar, serial } from "drizzle-orm/pg-core";
+import { integer, pgEnum, pgTable, text, timestamp, varchar, serial, boolean, jsonb } from "drizzle-orm/pg-core";
 
 /**
  * Core user table backing auth flow.
@@ -11,11 +11,44 @@ export const roleEnum = pgEnum("role", ["user", "admin"]);
 export const formatEnum = pgEnum("format", ["B2B", "B2C", "mixed"]);
 export const interviewTypeEnum = pgEnum("interview_type", ["voice", "form_full", "form_short"]);
 export const statusEnum = pgEnum("status", ["draft", "in_progress", "completed", "failed"]);
-export const processStatusEnum = pgEnum("process_status", ["draft", "in_review", "approved"]);
+export const processStatusEnum = pgEnum("process_status", ["draft", "in_review", "approved", "published", "archived"]);
 export const categoryEnum = pgEnum("category", ["optimization", "automation", "risk", "metric"]);
 export const priorityEnum = pgEnum("priority", ["high", "medium", "low"]);
 export const chatStatusEnum = pgEnum("chat_status", ["open", "closed"]);
 export const senderRoleEnum = pgEnum("sender_role", ["user", "admin"]);
+export const visibilityEnum = pgEnum("visibility", ["private", "public", "shared"]);
+export const accessRoleEnum = pgEnum("access_role", ["owner", "editor", "viewer", "commenter"]);
+export const notificationTypeEnum = pgEnum("notification_type", [
+  "collaboration_invite",
+  "new_comment",
+  "mention",
+  "process_update",
+  "task_deadline",
+  "system"
+]);
+
+// Process builder block types
+export const blockTypeEnum = pgEnum("block_type", [
+  // Start and End
+  "start", "end", "entry_point", "exit_point",
+  // Actions
+  "task", "subprocess", "manual_action", "automated_action", "send_notification", "api_call",
+  // Decisions
+  "condition", "multiple_choice", "parallel_gateway", "exclusive_gateway",
+  // Data
+  "data_input", "data_output", "data_store", "document",
+  // Events
+  "timer_event", "signal_event", "error_event", "escalation_event",
+  // Participants
+  "role", "department", "external_system"
+]);
+
+// Connection types
+export const connectionTypeEnum = pgEnum("connection_type", [
+  "sequence_flow",
+  "data_flow",
+  "conditional_flow"
+]);
 
 
 export const users = pgTable("users", {
@@ -32,6 +65,7 @@ export const users = pgTable("users", {
   providerId: varchar("provider_id", { length: 255 }), // Google ID or null for local
   role: roleEnum("role").default("user").notNull(),
   tokenBalance: integer("token_balance").default(1000).notNull(),
+  language: varchar("language", { length: 10 }).default("ru"), // User's preferred language
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   lastSignedIn: timestamp("last_signed_in").defaultNow().notNull(),
@@ -85,7 +119,191 @@ export const interviews = pgTable("interviews", {
 export type Interview = typeof interviews.$inferSelect;
 export type InsertInterview = typeof interviews.$inferInsert;
 
-// Business processes table
+// ==================== Process Builder Tables ====================
+
+// Process Categories
+export const processCategories = pgTable("process_categories", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  color: varchar("color", { length: 7 }), // Hex color code
+  icon: varchar("icon", { length: 100 }), // Icon name from lucide-react
+  parentId: integer("parent_id").references((): any => processCategories.id, { onDelete: "set null" }),
+  order: integer("order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type ProcessCategory = typeof processCategories.$inferSelect;
+export type InsertProcessCategory = typeof processCategories.$inferInsert;
+
+// Process builder - main process table
+export const builderProcesses = pgTable("builder_processes", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  companyId: integer("company_id").references(() => companies.id, { onDelete: "set null" }),
+  categoryId: integer("category_id").references(() => processCategories.id, { onDelete: "set null" }),
+  
+  // Basic info
+  name: varchar("name", { length: 500 }).notNull(),
+  description: text("description"),
+  tags: text("tags"), // JSON array of tags
+  
+  // Process data (JSON)
+  nodes: text("nodes"), // JSON array of nodes/blocks
+  edges: text("edges"), // JSON array of connections
+  viewport: text("viewport"), // JSON object with x, y, zoom
+  
+  // Status and visibility
+  status: processStatusEnum("status").default("draft").notNull(),
+  visibility: visibilityEnum("visibility").default("private").notNull(),
+  
+  // Versioning
+  currentVersion: integer("current_version").default(1).notNull(),
+  
+  // Statistics
+  viewCount: integer("view_count").default(0).notNull(),
+  
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  publishedAt: timestamp("published_at"),
+  archivedAt: timestamp("archived_at"),
+});
+
+export type BuilderProcess = typeof builderProcesses.$inferSelect;
+export type InsertBuilderProcess = typeof builderProcesses.$inferInsert;
+
+// Process versions
+export const processVersions = pgTable("process_versions", {
+  id: serial("id").primaryKey(),
+  processId: integer("process_id").notNull().references(() => builderProcesses.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  
+  version: integer("version").notNull(),
+  
+  // Snapshot of process data
+  nodes: text("nodes").notNull(),
+  edges: text("edges").notNull(),
+  viewport: text("viewport"),
+  
+  // Metadata
+  comment: text("comment"), // Version comment
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type ProcessVersion = typeof processVersions.$inferSelect;
+export type InsertProcessVersion = typeof processVersions.$inferInsert;
+
+// Process collaborators
+export const processCollaborators = pgTable("process_collaborators", {
+  id: serial("id").primaryKey(),
+  processId: integer("process_id").notNull().references(() => builderProcesses.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  
+  accessRole: accessRoleEnum("access_role").default("viewer").notNull(),
+  invitedBy: integer("invited_by").references(() => users.id, { onDelete: "set null" }),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type ProcessCollaborator = typeof processCollaborators.$inferSelect;
+export type InsertProcessCollaborator = typeof processCollaborators.$inferInsert;
+
+// Process comments
+export const processComments = pgTable("process_comments", {
+  id: serial("id").primaryKey(),
+  processId: integer("process_id").notNull().references(() => builderProcesses.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  
+  nodeId: varchar("node_id", { length: 100 }), // If comment is attached to specific node
+  parentId: integer("parent_id").references((): any => processComments.id, { onDelete: "cascade" }), // For threaded comments
+  
+  content: text("content").notNull(),
+  isResolved: integer("is_resolved").default(0).notNull(),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type ProcessComment = typeof processComments.$inferSelect;
+export type InsertProcessComment = typeof processComments.$inferInsert;
+
+// Process templates
+export const processTemplates = pgTable("process_templates", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id, { onDelete: "set null" }), // null for system templates
+  categoryId: integer("category_id").references(() => processCategories.id, { onDelete: "set null" }),
+  
+  name: varchar("name", { length: 500 }).notNull(),
+  description: text("description"),
+  thumbnail: text("thumbnail"), // URL to template preview image
+  
+  // Template data
+  nodes: text("nodes").notNull(),
+  edges: text("edges").notNull(),
+  
+  // Metadata
+  isSystem: integer("is_system").default(0).notNull(), // 1 for pre-built templates
+  isPublic: integer("is_public").default(0).notNull(), // 1 for community templates
+  
+  // Statistics
+  useCount: integer("use_count").default(0).notNull(),
+  rating: integer("rating").default(0).notNull(), // Average rating * 100
+  ratingCount: integer("rating_count").default(0).notNull(),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type ProcessTemplate = typeof processTemplates.$inferSelect;
+export type InsertProcessTemplate = typeof processTemplates.$inferInsert;
+
+// Notifications
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  
+  type: notificationTypeEnum("type").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  message: text("message").notNull(),
+  
+  // Related entities
+  processId: integer("process_id").references(() => builderProcesses.id, { onDelete: "cascade" }),
+  commentId: integer("comment_id").references(() => processComments.id, { onDelete: "cascade" }),
+  fromUserId: integer("from_user_id").references(() => users.id, { onDelete: "set null" }),
+  
+  // Status
+  isRead: integer("is_read").default(0).notNull(),
+  
+  // Additional data (JSON)
+  data: text("data"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = typeof notifications.$inferInsert;
+
+// Saved filters
+export const savedFilters = pgTable("saved_filters", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  
+  name: varchar("name", { length: 255 }).notNull(),
+  filters: text("filters").notNull(), // JSON object with filter criteria
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type SavedFilter = typeof savedFilters.$inferSelect;
+export type InsertSavedFilter = typeof savedFilters.$inferInsert;
+
+// ==================== Legacy Tables ====================
+
+// Business processes table (legacy - kept for compatibility)
 export const businessProcesses = pgTable("business_processes", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
@@ -132,7 +350,7 @@ export const recommendations = pgTable("recommendations", {
 export type Recommendation = typeof recommendations.$inferSelect;
 export type InsertRecommendation = typeof recommendations.$inferInsert;
 
-// Comments table
+// Comments table (legacy)
 export const comments = pgTable("comments", {
   id: serial("id").primaryKey(),
   businessProcessId: integer("business_process_id").notNull().references(() => businessProcesses.id, { onDelete: "cascade" }),
@@ -223,5 +441,3 @@ export const faqArticles = pgTable("faq_articles", {
 
 export type FaqArticle = typeof faqArticles.$inferSelect;
 export type InsertFaqArticle = typeof faqArticles.$inferInsert;
-
-

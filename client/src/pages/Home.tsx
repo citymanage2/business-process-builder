@@ -30,6 +30,9 @@ export default function Home() {
                 <Link href="/profile">
                   <Button variant="ghost">Личный кабинет</Button>
                 </Link>
+                <Link href="/processes">
+                  <Button variant="outline">Конструктор процессов</Button>
+                </Link>
                 <Link href="/companies">
                   <Button>Компании</Button>
                 </Link>
