@@ -2,7 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { APP_TITLE, getLoginUrl } from "@/const";
-import { ArrowRight, Mic, Sparkles, GitBranch, TrendingUp } from "lucide-react";
+import { ArrowRight, Mic, Sparkles, GitBranch, TrendingUp, Blocks, Users, FileText, Share2 } from "lucide-react";
 import { Link } from "wouter";
 
 export default function Home() {
@@ -27,8 +27,11 @@ export default function Home() {
           <div className="flex items-center gap-3">
             {isAuthenticated ? (
               <>
+                <Link href="/processes">
+                  <Button variant="ghost">Конструктор</Button>
+                </Link>
                 <Link href="/profile">
-                  <Button variant="ghost">Личный кабинет</Button>
+                  <Button variant="ghost">Профиль</Button>
                 </Link>
                 <Link href="/companies">
                   <Button>Компании</Button>
@@ -129,25 +132,85 @@ export default function Home() {
           </div>
         </section>
 
+        {/* Visual Process Builder Section */}
+        <section className="container mx-auto px-4 py-16">
+          <div className="bg-muted/50 rounded-2xl p-8 md:p-12">
+            <div className="grid md:grid-cols-2 gap-8 items-center">
+              <div>
+                <h3 className="text-3xl font-bold mb-4">Визуальный конструктор процессов</h3>
+                <p className="text-lg text-muted-foreground mb-6">
+                  Создавайте бизнес-процессы с помощью drag-and-drop интерфейса. 
+                  Библиотека готовых блоков, автоматическая валидация и экспорт в различные форматы.
+                </p>
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div className="flex items-center gap-2">
+                    <Blocks className="w-5 h-5 text-primary" />
+                    <span>26 типов блоков</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-primary" />
+                    <span>Экспорт в PDF/PNG</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Users className="w-5 h-5 text-primary" />
+                    <span>Совместная работа</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Share2 className="w-5 h-5 text-primary" />
+                    <span>История версий</span>
+                  </div>
+                </div>
+                {isAuthenticated ? (
+                  <Link href="/processes">
+                    <Button size="lg" className="gap-2">
+                      Открыть конструктор <ArrowRight className="w-5 h-5" />
+                    </Button>
+                  </Link>
+                ) : (
+                  <a href={getLoginUrl()}>
+                    <Button size="lg" className="gap-2">
+                      Попробовать бесплатно <ArrowRight className="w-5 h-5" />
+                    </Button>
+                  </a>
+                )}
+              </div>
+              <div className="bg-background rounded-xl p-4 shadow-lg">
+                <div className="aspect-video bg-gradient-to-br from-primary/5 to-indigo-500/5 rounded-lg flex items-center justify-center">
+                  <GitBranch className="w-24 h-24 text-primary/30" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section className="container mx-auto px-4 py-16">
           <div className="bg-gradient-to-r from-primary to-indigo-600 rounded-2xl p-12 text-white text-center">
             <h3 className="text-3xl font-bold mb-4">Готовы оптимизировать ваш бизнес?</h3>
             <p className="text-xl mb-8 opacity-90">
               Создайте первый бизнес-процесс бесплатно прямо сейчас
             </p>
-            {isAuthenticated ? (
-              <Link href="/companies">
-                <Button size="lg" variant="secondary" className="gap-2">
-                  Создать компанию <ArrowRight className="w-5 h-5" />
-                </Button>
-              </Link>
-            ) : (
-              <a href={getLoginUrl()}>
-                <Button size="lg" variant="secondary" className="gap-2">
-                  Начать <ArrowRight className="w-5 h-5" />
-                </Button>
-              </a>
-            )}
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              {isAuthenticated ? (
+                <>
+                  <Link href="/companies">
+                    <Button size="lg" variant="secondary" className="gap-2">
+                      Создать компанию <ArrowRight className="w-5 h-5" />
+                    </Button>
+                  </Link>
+                  <Link href="/builder/new">
+                    <Button size="lg" variant="outline" className="gap-2 bg-white/10 border-white/30 hover:bg-white/20">
+                      Конструктор процессов <ArrowRight className="w-5 h-5" />
+                    </Button>
+                  </Link>
+                </>
+              ) : (
+                <a href={getLoginUrl()}>
+                  <Button size="lg" variant="secondary" className="gap-2">
+                    Начать <ArrowRight className="w-5 h-5" />
+                  </Button>
+                </a>
+              )}
+            </div>
           </div>
         </section>
       </main>
