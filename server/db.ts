@@ -1,4 +1,4 @@
-import { eq, like, and, or } from "drizzle-orm";
+import { eq, like, and, or, desc, asc, sql, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { 
@@ -12,7 +12,20 @@ import {
   InsertErrorLog, errorLogs,
   InsertSupportChat, supportChats,
   InsertSupportMessage, supportMessages,
-  InsertFaqArticle, faqArticles, FaqArticle
+  InsertFaqArticle, faqArticles, FaqArticle,
+  // Process Builder imports
+  InsertBuilderProcess, builderProcesses, BuilderProcess,
+  InsertProcessVersion, processVersions, ProcessVersion,
+  InsertProcessCategory, processCategories, ProcessCategory,
+  InsertProcessTag, processTags, ProcessTag,
+  InsertProcessTagRelation, processTagRelations,
+  InsertProcessAccess, processAccess, ProcessAccess,
+  InsertProcessComment, processComments, ProcessComment,
+  InsertProcessTemplate, processTemplates, ProcessTemplate,
+  InsertTemplateRating, templateRatings,
+  InsertUserNotification, userNotifications, UserNotification,
+  InsertNotificationSetting, notificationSettings,
+  InsertSavedFilter, savedFilters
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -739,4 +752,725 @@ export async function updateUserPassword(userId: number, passwordHash: string): 
   if (!db) throw new Error("Database not available");
 
   await db.update(users).set({ passwordHash }).where(eq(users.id, userId));
+}
+
+// ============================================================================
+// Process Builder Database Operations
+// ============================================================================
+
+// ==================== Process Categories ====================
+
+export async function getAllProcessCategories(): Promise<ProcessCategory[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  return await db.select().from(processCategories).orderBy(processCategories.order);
+}
+
+export async function getProcessCategoryById(id: number): Promise<ProcessCategory | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  
+  const result = await db.select().from(processCategories).where(eq(processCategories.id, id)).limit(1);
+  return result[0];
+}
+
+export async function createProcessCategory(category: InsertProcessCategory): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.insert(processCategories).values(category).returning({ id: processCategories.id });
+  return result[0].id;
+}
+
+export async function updateProcessCategory(id: number, data: Partial<InsertProcessCategory>): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.update(processCategories).set({ ...data, updatedAt: new Date() }).where(eq(processCategories.id, id));
+}
+
+export async function deleteProcessCategory(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.delete(processCategories).where(eq(processCategories.id, id));
+}
+
+// ==================== Process Tags ====================
+
+export async function getAllProcessTags(): Promise<ProcessTag[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  return await db.select().from(processTags).orderBy(processTags.name);
+}
+
+export async function createProcessTag(tag: InsertProcessTag): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.insert(processTags).values(tag).returning({ id: processTags.id });
+  return result[0].id;
+}
+
+export async function deleteProcessTag(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.delete(processTags).where(eq(processTags.id, id));
+}
+
+export async function getOrCreateTag(name: string, color?: string): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  // Try to find existing tag
+  const existing = await db.select().from(processTags).where(eq(processTags.name, name)).limit(1);
+  if (existing.length > 0) {
+    return existing[0].id;
+  }
+  
+  // Create new tag
+  return await createProcessTag({ name, color });
+}
+
+// ==================== Builder Processes ====================
+
+export async function createBuilderProcess(process: InsertBuilderProcess): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.insert(builderProcesses).values(process).returning({ id: builderProcesses.id });
+  return result[0].id;
+}
+
+export async function getBuilderProcessById(id: number): Promise<BuilderProcess | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  
+  const result = await db.select().from(builderProcesses).where(eq(builderProcesses.id, id)).limit(1);
+  return result[0];
+}
+
+export async function getUserBuilderProcesses(userId: number): Promise<BuilderProcess[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  return await db.select()
+    .from(builderProcesses)
+    .where(eq(builderProcesses.userId, userId))
+    .orderBy(desc(builderProcesses.lastEditedAt));
+}
+
+export async function getPublicBuilderProcesses(limit: number = 50, offset: number = 0): Promise<BuilderProcess[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  return await db.select()
+    .from(builderProcesses)
+    .where(and(
+      eq(builderProcesses.visibility, "public"),
+      eq(builderProcesses.status, "published")
+    ))
+    .orderBy(desc(builderProcesses.viewCount))
+    .limit(limit)
+    .offset(offset);
+}
+
+export async function updateBuilderProcess(id: number, data: Partial<InsertBuilderProcess>): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.update(builderProcesses).set({ 
+    ...data, 
+    updatedAt: new Date(),
+    lastEditedAt: new Date()
+  }).where(eq(builderProcesses.id, id));
+}
+
+export async function deleteBuilderProcess(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  // Delete related records first
+  await db.delete(processVersions).where(eq(processVersions.processId, id));
+  await db.delete(processTagRelations).where(eq(processTagRelations.processId, id));
+  await db.delete(processAccess).where(eq(processAccess.processId, id));
+  await db.delete(processComments).where(eq(processComments.processId, id));
+  
+  // Delete the process
+  await db.delete(builderProcesses).where(eq(builderProcesses.id, id));
+}
+
+export async function archiveBuilderProcess(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.update(builderProcesses).set({ 
+    status: "archived",
+    updatedAt: new Date()
+  }).where(eq(builderProcesses.id, id));
+}
+
+export async function incrementProcessViewCount(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  
+  await db.update(builderProcesses)
+    .set({ viewCount: sql`${builderProcesses.viewCount} + 1` })
+    .where(eq(builderProcesses.id, id));
+}
+
+export async function searchBuilderProcesses(
+  userId: number,
+  query: string,
+  filters?: {
+    categoryId?: number;
+    tagIds?: number[];
+    status?: "draft" | "published" | "archived";
+    visibility?: "private" | "public";
+  }
+): Promise<BuilderProcess[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const searchTerm = `%${query.toLowerCase()}%`;
+  
+  let conditions = [
+    or(
+      eq(builderProcesses.userId, userId),
+      and(eq(builderProcesses.visibility, "public"), eq(builderProcesses.status, "published"))
+    ),
+    or(
+      like(sql`LOWER(${builderProcesses.title})`, searchTerm),
+      like(sql`LOWER(${builderProcesses.description})`, searchTerm)
+    )
+  ];
+  
+  if (filters?.categoryId) {
+    conditions.push(eq(builderProcesses.categoryId, filters.categoryId));
+  }
+  if (filters?.status) {
+    conditions.push(eq(builderProcesses.status, filters.status));
+  }
+  if (filters?.visibility) {
+    conditions.push(eq(builderProcesses.visibility, filters.visibility));
+  }
+  
+  return await db.select()
+    .from(builderProcesses)
+    .where(and(...conditions))
+    .orderBy(desc(builderProcesses.lastEditedAt))
+    .limit(50);
+}
+
+// ==================== Process Versions ====================
+
+export async function createProcessVersion(version: InsertProcessVersion): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.insert(processVersions).values(version).returning({ id: processVersions.id });
+  return result[0].id;
+}
+
+export async function getProcessVersions(processId: number): Promise<ProcessVersion[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  return await db.select()
+    .from(processVersions)
+    .where(eq(processVersions.processId, processId))
+    .orderBy(desc(processVersions.version));
+}
+
+export async function getProcessVersionById(id: number): Promise<ProcessVersion | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  
+  const result = await db.select().from(processVersions).where(eq(processVersions.id, id)).limit(1);
+  return result[0];
+}
+
+export async function getLatestVersionNumber(processId: number): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  
+  const result = await db.select({ version: processVersions.version })
+    .from(processVersions)
+    .where(eq(processVersions.processId, processId))
+    .orderBy(desc(processVersions.version))
+    .limit(1);
+  
+  return result.length > 0 ? result[0].version : 0;
+}
+
+// ==================== Process Tag Relations ====================
+
+export async function addTagsToProcess(processId: number, tagIds: number[]): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  // Delete existing tags
+  await db.delete(processTagRelations).where(eq(processTagRelations.processId, processId));
+  
+  // Add new tags
+  if (tagIds.length > 0) {
+    const values = tagIds.map(tagId => ({ processId, tagId }));
+    await db.insert(processTagRelations).values(values);
+  }
+}
+
+export async function getProcessTags(processId: number): Promise<ProcessTag[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const relations = await db.select({ tagId: processTagRelations.tagId })
+    .from(processTagRelations)
+    .where(eq(processTagRelations.processId, processId));
+  
+  if (relations.length === 0) return [];
+  
+  const tagIds = relations.map(r => r.tagId);
+  return await db.select().from(processTags).where(inArray(processTags.id, tagIds));
+}
+
+// ==================== Process Access (Sharing) ====================
+
+export async function createProcessAccess(access: InsertProcessAccess): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.insert(processAccess).values(access).returning({ id: processAccess.id });
+  return result[0].id;
+}
+
+export async function getProcessAccessList(processId: number): Promise<(ProcessAccess & { user?: { id: number; name: string | null; email: string | null } })[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const accesses = await db.select({
+    id: processAccess.id,
+    processId: processAccess.processId,
+    userId: processAccess.userId,
+    accessLevel: processAccess.accessLevel,
+    inviteToken: processAccess.inviteToken,
+    invitedAt: processAccess.invitedAt,
+    acceptedAt: processAccess.acceptedAt,
+    userName: users.name,
+    userEmail: users.email,
+  })
+    .from(processAccess)
+    .leftJoin(users, eq(processAccess.userId, users.id))
+    .where(eq(processAccess.processId, processId));
+  
+  return accesses.map(a => ({
+    ...a,
+    user: a.userName || a.userEmail ? { id: a.userId, name: a.userName, email: a.userEmail } : undefined
+  }));
+}
+
+export async function getUserAccessToProcess(processId: number, userId: number): Promise<ProcessAccess | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  
+  const result = await db.select()
+    .from(processAccess)
+    .where(and(eq(processAccess.processId, processId), eq(processAccess.userId, userId)))
+    .limit(1);
+  
+  return result[0];
+}
+
+export async function updateProcessAccess(id: number, data: Partial<InsertProcessAccess>): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.update(processAccess).set(data).where(eq(processAccess.id, id));
+}
+
+export async function deleteProcessAccess(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.delete(processAccess).where(eq(processAccess.id, id));
+}
+
+export async function getAccessByInviteToken(token: string): Promise<ProcessAccess | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  
+  const result = await db.select()
+    .from(processAccess)
+    .where(eq(processAccess.inviteToken, token))
+    .limit(1);
+  
+  return result[0];
+}
+
+export async function getSharedProcessesForUser(userId: number): Promise<BuilderProcess[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const accesses = await db.select({ processId: processAccess.processId })
+    .from(processAccess)
+    .where(eq(processAccess.userId, userId));
+  
+  if (accesses.length === 0) return [];
+  
+  const processIds = accesses.map(a => a.processId);
+  return await db.select()
+    .from(builderProcesses)
+    .where(inArray(builderProcesses.id, processIds))
+    .orderBy(desc(builderProcesses.lastEditedAt));
+}
+
+// ==================== Process Comments ====================
+
+export async function createProcessComment(comment: InsertProcessComment): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.insert(processComments).values(comment).returning({ id: processComments.id });
+  return result[0].id;
+}
+
+export async function getProcessCommentsList(processId: number): Promise<(ProcessComment & { user?: { id: number; name: string | null; email: string | null } })[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const commentList = await db.select({
+    id: processComments.id,
+    processId: processComments.processId,
+    userId: processComments.userId,
+    parentId: processComments.parentId,
+    nodeId: processComments.nodeId,
+    content: processComments.content,
+    isResolved: processComments.isResolved,
+    createdAt: processComments.createdAt,
+    updatedAt: processComments.updatedAt,
+    userName: users.name,
+    userEmail: users.email,
+  })
+    .from(processComments)
+    .leftJoin(users, eq(processComments.userId, users.id))
+    .where(eq(processComments.processId, processId))
+    .orderBy(asc(processComments.createdAt));
+  
+  return commentList.map(c => ({
+    ...c,
+    user: { id: c.userId, name: c.userName, email: c.userEmail }
+  }));
+}
+
+export async function updateProcessComment(id: number, data: Partial<InsertProcessComment>): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.update(processComments).set({ ...data, updatedAt: new Date() }).where(eq(processComments.id, id));
+}
+
+export async function deleteProcessComment(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.delete(processComments).where(eq(processComments.id, id));
+}
+
+export async function resolveProcessComment(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.update(processComments).set({ isResolved: 1, updatedAt: new Date() }).where(eq(processComments.id, id));
+}
+
+// ==================== Process Templates ====================
+
+export async function createProcessTemplate(template: InsertProcessTemplate): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.insert(processTemplates).values(template).returning({ id: processTemplates.id });
+  return result[0].id;
+}
+
+export async function getProcessTemplateById(id: number): Promise<ProcessTemplate | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  
+  const result = await db.select().from(processTemplates).where(eq(processTemplates.id, id)).limit(1);
+  return result[0];
+}
+
+export async function getPublicProcessTemplates(categoryId?: number): Promise<ProcessTemplate[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  let conditions = [
+    eq(processTemplates.isPublic, 1),
+    eq(processTemplates.isApproved, 1)
+  ];
+  
+  if (categoryId) {
+    conditions.push(eq(processTemplates.categoryId, categoryId));
+  }
+  
+  return await db.select()
+    .from(processTemplates)
+    .where(and(...conditions))
+    .orderBy(desc(processTemplates.usageCount));
+}
+
+export async function getUserProcessTemplates(userId: number): Promise<ProcessTemplate[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  return await db.select()
+    .from(processTemplates)
+    .where(eq(processTemplates.userId, userId))
+    .orderBy(desc(processTemplates.createdAt));
+}
+
+export async function updateProcessTemplate(id: number, data: Partial<InsertProcessTemplate>): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.update(processTemplates).set({ ...data, updatedAt: new Date() }).where(eq(processTemplates.id, id));
+}
+
+export async function deleteProcessTemplate(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.delete(templateRatings).where(eq(templateRatings.templateId, id));
+  await db.delete(processTemplates).where(eq(processTemplates.id, id));
+}
+
+export async function incrementTemplateUsageCount(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  
+  await db.update(processTemplates)
+    .set({ usageCount: sql`${processTemplates.usageCount} + 1` })
+    .where(eq(processTemplates.id, id));
+}
+
+// ==================== Template Ratings ====================
+
+export async function rateTemplate(templateId: number, userId: number, rating: number, review?: string): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  // Check if user already rated
+  const existing = await db.select()
+    .from(templateRatings)
+    .where(and(eq(templateRatings.templateId, templateId), eq(templateRatings.userId, userId)))
+    .limit(1);
+  
+  if (existing.length > 0) {
+    // Update existing rating
+    await db.update(templateRatings)
+      .set({ rating, review })
+      .where(eq(templateRatings.id, existing[0].id));
+  } else {
+    // Create new rating
+    await db.insert(templateRatings).values({ templateId, userId, rating, review });
+  }
+  
+  // Update template average rating
+  const allRatings = await db.select({ rating: templateRatings.rating })
+    .from(templateRatings)
+    .where(eq(templateRatings.templateId, templateId));
+  
+  const avgRating = Math.round(allRatings.reduce((sum, r) => sum + r.rating, 0) / allRatings.length * 100);
+  await db.update(processTemplates)
+    .set({ rating: avgRating, ratingCount: allRatings.length })
+    .where(eq(processTemplates.id, templateId));
+}
+
+// ==================== User Notifications ====================
+
+export async function createUserNotification(notification: InsertUserNotification): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.insert(userNotifications).values(notification).returning({ id: userNotifications.id });
+  return result[0].id;
+}
+
+export async function getUserNotifications(userId: number, limit: number = 50): Promise<UserNotification[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  return await db.select()
+    .from(userNotifications)
+    .where(eq(userNotifications.userId, userId))
+    .orderBy(desc(userNotifications.createdAt))
+    .limit(limit);
+}
+
+export async function markNotificationAsRead(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.update(userNotifications).set({ isRead: 1 }).where(eq(userNotifications.id, id));
+}
+
+export async function markAllNotificationsAsRead(userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.update(userNotifications).set({ isRead: 1 }).where(eq(userNotifications.userId, userId));
+}
+
+export async function getUnreadNotificationCount(userId: number): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  
+  const result = await db.select()
+    .from(userNotifications)
+    .where(and(eq(userNotifications.userId, userId), eq(userNotifications.isRead, 0)));
+  
+  return result.length;
+}
+
+export async function deleteNotification(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.delete(userNotifications).where(eq(userNotifications.id, id));
+}
+
+// ==================== Notification Settings ====================
+
+export async function getOrCreateNotificationSettings(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const existing = await db.select()
+    .from(notificationSettings)
+    .where(eq(notificationSettings.userId, userId))
+    .limit(1);
+  
+  if (existing.length > 0) {
+    return existing[0];
+  }
+  
+  // Create default settings
+  await db.insert(notificationSettings).values({ userId });
+  
+  const newSettings = await db.select()
+    .from(notificationSettings)
+    .where(eq(notificationSettings.userId, userId))
+    .limit(1);
+  
+  return newSettings[0];
+}
+
+export async function updateNotificationSettings(userId: number, data: Partial<InsertNotificationSetting>): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.update(notificationSettings)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(notificationSettings.userId, userId));
+}
+
+// ==================== Saved Filters ====================
+
+export async function createSavedFilter(filter: InsertSavedFilter): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.insert(savedFilters).values(filter).returning({ id: savedFilters.id });
+  return result[0].id;
+}
+
+export async function getUserSavedFilters(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  return await db.select()
+    .from(savedFilters)
+    .where(eq(savedFilters.userId, userId))
+    .orderBy(savedFilters.name);
+}
+
+export async function deleteSavedFilter(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.delete(savedFilters).where(eq(savedFilters.id, id));
+}
+
+// ==================== Analytics Helpers ====================
+
+export async function getUserProcessStats(userId: number) {
+  const db = await getDb();
+  if (!db) return { total: 0, drafts: 0, published: 0, archived: 0, totalViews: 0 };
+  
+  const processes = await db.select()
+    .from(builderProcesses)
+    .where(eq(builderProcesses.userId, userId));
+  
+  return {
+    total: processes.length,
+    drafts: processes.filter(p => p.status === "draft").length,
+    published: processes.filter(p => p.status === "published").length,
+    archived: processes.filter(p => p.status === "archived").length,
+    totalViews: processes.reduce((sum, p) => sum + (p.viewCount || 0), 0)
+  };
+}
+
+export async function getRecentActivity(userId: number, days: number = 30): Promise<{ date: string; count: number }[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+  
+  const processes = await db.select({ lastEditedAt: builderProcesses.lastEditedAt })
+    .from(builderProcesses)
+    .where(and(
+      eq(builderProcesses.userId, userId),
+      sql`${builderProcesses.lastEditedAt} >= ${startDate}`
+    ));
+  
+  // Group by date
+  const activity: Record<string, number> = {};
+  processes.forEach(p => {
+    const date = p.lastEditedAt?.toISOString().split('T')[0];
+    if (date) {
+      activity[date] = (activity[date] || 0) + 1;
+    }
+  });
+  
+  return Object.entries(activity).map(([date, count]) => ({ date, count })).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+// Admin analytics
+export async function getGlobalProcessStats() {
+  const db = await getDb();
+  if (!db) return { totalProcesses: 0, totalUsers: 0, totalTemplates: 0, activeUsersLast30Days: 0 };
+  
+  const allProcesses = await db.select().from(builderProcesses);
+  const allUsers = await db.select().from(users);
+  const allTemplates = await db.select().from(processTemplates);
+  
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  
+  const activeUsers = await db.select({ userId: builderProcesses.userId })
+    .from(builderProcesses)
+    .where(sql`${builderProcesses.lastEditedAt} >= ${thirtyDaysAgo}`);
+  
+  const uniqueActiveUsers = new Set(activeUsers.map(u => u.userId));
+  
+  return {
+    totalProcesses: allProcesses.length,
+    totalUsers: allUsers.length,
+    totalTemplates: allTemplates.length,
+    activeUsersLast30Days: uniqueActiveUsers.size
+  };
 }

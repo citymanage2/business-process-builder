@@ -3,6 +3,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { builderRouter } from "./routers/builder";
 import {
   createCompany,
   getUserCompanies,
@@ -58,6 +59,9 @@ export const appRouter = router({
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
   }),
+  
+  // Process Builder routes
+  builder: builderRouter,
 
   companies: router({
     list: protectedProcedure.query(async ({ ctx }) => {

@@ -224,4 +224,219 @@ export const faqArticles = pgTable("faq_articles", {
 export type FaqArticle = typeof faqArticles.$inferSelect;
 export type InsertFaqArticle = typeof faqArticles.$inferInsert;
 
+// ============== Business Process Builder Tables ==============
+
+// Enums for process builder
+export const builderProcessStatusEnum = pgEnum("builder_process_status", ["draft", "published", "archived"]);
+export const processVisibilityEnum = pgEnum("process_visibility", ["private", "public"]);
+export const blockTypeEnum = pgEnum("block_type", [
+  // Start and End
+  "start", "end", "entry_point", "exit_point",
+  // Actions
+  "task", "subprocess", "manual_action", "automated_action", "send_notification", "api_call",
+  // Decisions
+  "condition", "multiple_choice", "parallel_gateway", "exclusive_gateway",
+  // Data
+  "data_input", "data_output", "data_store", "document",
+  // Events
+  "timer_event", "signal_event", "error_event", "escalation_event",
+  // Participants
+  "role", "department", "external_system"
+]);
+export const connectionTypeEnum = pgEnum("connection_type", ["sequence", "data", "conditional"]);
+export const accessLevelEnum = pgEnum("access_level", ["owner", "editor", "commenter", "viewer"]);
+export const notificationTypeEnum = pgEnum("notification_type", [
+  "collaboration_invite", "comment_added", "mention", "process_updated", "deadline_approaching", "system"
+]);
+
+// Process Categories
+export const processCategories = pgTable("process_categories", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  color: varchar("color", { length: 7 }), // hex color
+  icon: varchar("icon", { length: 100 }),
+  parentId: integer("parent_id").references((): any => processCategories.id, { onDelete: "set null" }),
+  order: integer("order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type ProcessCategory = typeof processCategories.$inferSelect;
+export type InsertProcessCategory = typeof processCategories.$inferInsert;
+
+// Process Tags
+export const processTags = pgTable("process_tags", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 100 }).notNull().unique(),
+  color: varchar("color", { length: 7 }), // hex color
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type ProcessTag = typeof processTags.$inferSelect;
+export type InsertProcessTag = typeof processTags.$inferInsert;
+
+// Builder Processes - main table for process builder
+export const builderProcesses = pgTable("builder_processes", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  categoryId: integer("category_id").references(() => processCategories.id, { onDelete: "set null" }),
+  title: varchar("title", { length: 500 }).notNull(),
+  description: text("description"),
+  status: builderProcessStatusEnum("status").default("draft").notNull(),
+  visibility: processVisibilityEnum("visibility").default("private").notNull(),
+  currentVersion: integer("current_version").default(1).notNull(),
+  // Canvas data stored as JSON
+  nodes: text("nodes"), // JSON array of ReactFlow nodes
+  edges: text("edges"), // JSON array of ReactFlow edges
+  viewport: text("viewport"), // JSON object with zoom and position
+  // Metadata
+  thumbnail: text("thumbnail"), // base64 or URL of process preview
+  viewCount: integer("view_count").default(0).notNull(),
+  lastEditedAt: timestamp("last_edited_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type BuilderProcess = typeof builderProcesses.$inferSelect;
+export type InsertBuilderProcess = typeof builderProcesses.$inferInsert;
+
+// Process Versions - for version history
+export const processVersions = pgTable("process_versions", {
+  id: serial("id").primaryKey(),
+  processId: integer("process_id").notNull().references(() => builderProcesses.id, { onDelete: "cascade" }),
+  version: integer("version").notNull(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  comment: text("comment"),
+  // Snapshot of process state
+  nodes: text("nodes").notNull(),
+  edges: text("edges").notNull(),
+  viewport: text("viewport"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type ProcessVersion = typeof processVersions.$inferSelect;
+export type InsertProcessVersion = typeof processVersions.$inferInsert;
+
+// Process-Tag Junction Table
+export const processTagRelations = pgTable("process_tag_relations", {
+  id: serial("id").primaryKey(),
+  processId: integer("process_id").notNull().references(() => builderProcesses.id, { onDelete: "cascade" }),
+  tagId: integer("tag_id").notNull().references(() => processTags.id, { onDelete: "cascade" }),
+});
+
+export type ProcessTagRelation = typeof processTagRelations.$inferSelect;
+export type InsertProcessTagRelation = typeof processTagRelations.$inferInsert;
+
+// Process Access - for sharing and collaboration
+export const processAccess = pgTable("process_access", {
+  id: serial("id").primaryKey(),
+  processId: integer("process_id").notNull().references(() => builderProcesses.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  accessLevel: accessLevelEnum("access_level").notNull(),
+  inviteToken: varchar("invite_token", { length: 64 }),
+  invitedAt: timestamp("invited_at").defaultNow().notNull(),
+  acceptedAt: timestamp("accepted_at"),
+});
+
+export type ProcessAccess = typeof processAccess.$inferSelect;
+export type InsertProcessAccess = typeof processAccess.$inferInsert;
+
+// Process Comments - for collaboration
+export const processComments = pgTable("process_comments", {
+  id: serial("id").primaryKey(),
+  processId: integer("process_id").notNull().references(() => builderProcesses.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  parentId: integer("parent_id").references((): any => processComments.id, { onDelete: "cascade" }),
+  nodeId: varchar("node_id", { length: 100 }), // Optional: comment on specific node
+  content: text("content").notNull(),
+  isResolved: integer("is_resolved").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type ProcessComment = typeof processComments.$inferSelect;
+export type InsertProcessComment = typeof processComments.$inferInsert;
+
+// Process Templates
+export const processTemplates = pgTable("process_templates", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  categoryId: integer("category_id").references(() => processCategories.id, { onDelete: "set null" }),
+  title: varchar("title", { length: 500 }).notNull(),
+  description: text("description"),
+  // Template data
+  nodes: text("nodes").notNull(),
+  edges: text("edges").notNull(),
+  // Metadata
+  isPublic: integer("is_public").default(0).notNull(),
+  isApproved: integer("is_approved").default(0).notNull(), // For moderation
+  usageCount: integer("usage_count").default(0).notNull(),
+  rating: integer("rating").default(0).notNull(), // Average rating * 100 (e.g., 450 = 4.5)
+  ratingCount: integer("rating_count").default(0).notNull(),
+  thumbnail: text("thumbnail"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type ProcessTemplate = typeof processTemplates.$inferSelect;
+export type InsertProcessTemplate = typeof processTemplates.$inferInsert;
+
+// Template Ratings
+export const templateRatings = pgTable("template_ratings", {
+  id: serial("id").primaryKey(),
+  templateId: integer("template_id").notNull().references(() => processTemplates.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  rating: integer("rating").notNull(), // 1-5
+  review: text("review"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type TemplateRating = typeof templateRatings.$inferSelect;
+export type InsertTemplateRating = typeof templateRatings.$inferInsert;
+
+// User Notifications
+export const userNotifications = pgTable("user_notifications", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: notificationTypeEnum("type").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  content: text("content"),
+  relatedProcessId: integer("related_process_id").references(() => builderProcesses.id, { onDelete: "cascade" }),
+  relatedCommentId: integer("related_comment_id").references(() => processComments.id, { onDelete: "cascade" }),
+  isRead: integer("is_read").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type UserNotification = typeof userNotifications.$inferSelect;
+export type InsertUserNotification = typeof userNotifications.$inferInsert;
+
+// User Notification Settings
+export const notificationSettings = pgTable("notification_settings", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }).unique(),
+  emailEnabled: integer("email_enabled").default(1).notNull(),
+  emailFrequency: varchar("email_frequency", { length: 20 }).default("instant").notNull(), // instant, daily
+  pushEnabled: integer("push_enabled").default(1).notNull(),
+  quietHoursStart: varchar("quiet_hours_start", { length: 5 }), // HH:MM format
+  quietHoursEnd: varchar("quiet_hours_end", { length: 5 }), // HH:MM format
+  // Per-type settings (JSON object)
+  typeSettings: text("type_settings"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type NotificationSetting = typeof notificationSettings.$inferSelect;
+export type InsertNotificationSetting = typeof notificationSettings.$inferInsert;
+
+// Saved Filters
+export const savedFilters = pgTable("saved_filters", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 100 }).notNull(),
+  filters: text("filters").notNull(), // JSON object with filter criteria
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type SavedFilter = typeof savedFilters.$inferSelect;
+export type InsertSavedFilter = typeof savedFilters.$inferInsert;
 
