@@ -103,7 +103,10 @@ import {
   CheckCircle,
   AlertCircle,
   X,
+  Keyboard,
 } from "lucide-react";
+
+import KeyboardShortcutsHelp from "@/components/KeyboardShortcutsHelp";
 
 import {
   BLOCK_LIBRARY,
@@ -922,6 +925,9 @@ function ProcessBuilderContent() {
           >
             <Grid3X3 className="w-4 h-4" />
           </Button>
+
+          {/* Keyboard shortcuts help */}
+          <KeyboardShortcutsHelp />
 
           <Separator orientation="vertical" className="h-6" />
 
