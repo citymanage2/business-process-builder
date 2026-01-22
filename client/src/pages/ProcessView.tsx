@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useRoute } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import ProcessDiagram from "@/components/ProcessDiagram";
 import ProcessDiagramSwimlane from "@/components/ProcessDiagramSwimlane";
 import ProcessDiagramEditable from "@/components/ProcessDiagramEditable";
+import ProcessBuilder from "@/components/ProcessBuilder/ProcessBuilder";
+import { convertStepsToFlow } from "@/components/ProcessBuilder/utils";
 import ProcessModificationDialog from "@/components/ProcessModificationDialog";
 import ProcessMetrics from "@/components/ProcessMetrics";
 import CRMFunnels from "@/components/CRMFunnels";
@@ -28,13 +30,38 @@ export default function ProcessView() {
     onSuccess: () => {
       toast.success("Изменения сохранены");
       refetch();
-      // Не выходим из режима редактирования при автосохранении
-      // setEditMode(false); - убрано, теперь выход только по кнопке
     },
     onError: (error) => {
       toast.error(`Ошибка сохранения: ${error.message}`);
     },
   });
+
+  const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
+    if (process?.diagramData) {
+      try {
+        const parsed = JSON.parse(process.diagramData);
+        if (Array.isArray(parsed.nodes) && Array.isArray(parsed.edges)) {
+            return { nodes: parsed.nodes, edges: parsed.edges };
+        }
+      } catch (e) {
+        console.error("Failed to parse diagram data", e);
+      }
+    }
+    
+    if (process?.steps && process.steps.length > 0) {
+        return convertStepsToFlow(process.steps, process.roles || [], process.stages || []);
+    }
+
+    return { nodes: [], edges: [] };
+  }, [process?.diagramData, process?.steps, process?.roles, process?.stages]);
+
+  const handleSaveProcess = (nodes: any[], edges: any[]) => {
+      const diagramData = JSON.stringify({ nodes, edges });
+      updateProcessMutation.mutate({
+          id: processId,
+          diagramData,
+      });
+  };
 
   const recommendationsQuery = trpc.recommendations.list.useQuery({ processId });
 
@@ -194,26 +221,30 @@ export default function ProcessView() {
                 </div>
               </CardHeader>
               <CardContent>
-                {editMode ? (
-                  <ProcessDiagramEditable
-                    steps={process.steps || []}
-                    roles={process.roles || []}
-                    stages={process.stages || []}
-                    onSave={(updatedSteps) => {
-                      updateProcessMutation.mutate({
-                        id: processId,
-                        steps: updatedSteps,
-                      });
-                    }}
-                  />
-                ) : (
-                  <ProcessDiagramSwimlane
-                    steps={process.steps || []}
-                    roles={process.roles || []}
-                    stages={process.stages || []}
-                    title="Кросс-функциональная схема (Swimlane)"
-                  />
-                )}
+                <div className="h-[700px] border rounded-lg overflow-hidden bg-gray-50">
+                  {editMode ? (
+                    <ProcessBuilder
+                        initialNodes={initialNodes}
+                        initialEdges={initialEdges}
+                        onSave={handleSaveProcess}
+                    />
+                  ) : (
+                    initialNodes.length > 0 ? (
+                        <ProcessBuilder
+                            initialNodes={initialNodes}
+                            initialEdges={initialEdges}
+                            readOnly={true}
+                        />
+                    ) : (
+                        <ProcessDiagramSwimlane
+                            steps={process.steps || []}
+                            roles={process.roles || []}
+                            stages={process.stages || []}
+                            title="Кросс-функциональная схема (Swimlane)"
+                        />
+                    )
+                  )}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

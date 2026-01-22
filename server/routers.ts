@@ -45,6 +45,7 @@ import {
   updateFaqArticle,
   deleteFaqArticle,
   getFaqArticleById,
+  createBusinessProcessVersion,
 } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { transcribeAudio } from "./_core/voiceTranscription";
@@ -345,18 +346,46 @@ export const appRouter = router({
         description: z.string().optional(),
         status: z.enum(["draft", "in_review", "approved"]).optional(),
         steps: z.array(z.any()).optional(), // Массив шагов процесса
+        diagramData: z.string().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { id, steps, ...data } = input;
         
-        // Если есть steps, сериализуем их в JSON
-        if (steps) {
-          await updateBusinessProcess(id, {
-            ...data,
-            steps: JSON.stringify(steps),
-          });
+        const currentProcess = await getProcessById(id);
+        if (currentProcess) {
+            // Auto-versioning: Save current state
+            const snapshot = JSON.stringify({
+                 title: currentProcess.title,
+                 description: currentProcess.description,
+                 stages: currentProcess.stages,
+                 roles: currentProcess.roles,
+                 steps: currentProcess.steps,
+                 diagramData: currentProcess.diagramData,
+            });
+    
+            await createBusinessProcessVersion({
+                 businessProcessId: id,
+                 version: currentProcess.version,
+                 title: currentProcess.title,
+                 description: currentProcess.description,
+                 data: snapshot,
+                 createdBy: ctx.user.id,
+                 comment: "Auto-save",
+            });
+    
+            const updateData: any = { ...data };
+            if (steps) {
+                updateData.steps = JSON.stringify(steps);
+            }
+            updateData.version = currentProcess.version + 1;
+            updateData.updatedAt = new Date();
+    
+            await updateBusinessProcess(id, updateData);
         } else {
-          await updateBusinessProcess(id, data);
+             // Fallback if not found (should not happen usually)
+             const updateData: any = { ...data };
+             if (steps) updateData.steps = JSON.stringify(steps);
+             await updateBusinessProcess(id, updateData);
         }
         
         return { success: true };

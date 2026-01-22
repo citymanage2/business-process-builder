@@ -1,4 +1,4 @@
-import { integer, pgEnum, pgTable, text, timestamp, varchar, serial } from "drizzle-orm/pg-core";
+import { integer, pgEnum, pgTable, text, timestamp, varchar, serial, boolean } from "drizzle-orm/pg-core";
 
 /**
  * Core user table backing auth flow.
@@ -110,6 +110,9 @@ export const businessProcesses = pgTable("business_processes", {
   crmFunnels: text("crm_funnels"), // 3 варианта воронок CRM (JSON)
   requiredDocuments: text("required_documents"), // Список необходимых документов (JSON)
   salaryData: text("salary_data"), // Данные о зарплатах ролей (JSON)
+  isPublic: boolean("is_public").default(false).notNull(),
+  isTemplate: boolean("is_template").default(false).notNull(),
+  tags: text("tags"), // JSON array of strings
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -225,3 +228,18 @@ export type FaqArticle = typeof faqArticles.$inferSelect;
 export type InsertFaqArticle = typeof faqArticles.$inferInsert;
 
 
+// Business Process Versions
+export const businessProcessVersions = pgTable("business_process_versions", {
+  id: serial("id").primaryKey(),
+  businessProcessId: integer("business_process_id").notNull().references(() => businessProcesses.id, { onDelete: "cascade" }),
+  version: integer("version").notNull(),
+  title: varchar("title", { length: 500 }).notNull(),
+  description: text("description"),
+  data: text("data"), // JSON containing the full process definition (stages, steps, diagrams, etc.)
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+  comment: text("comment"),
+});
+
+export type BusinessProcessVersion = typeof businessProcessVersions.$inferSelect;
+export type InsertBusinessProcessVersion = typeof businessProcessVersions.$inferInsert;

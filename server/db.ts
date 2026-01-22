@@ -12,7 +12,8 @@ import {
   InsertErrorLog, errorLogs,
   InsertSupportChat, supportChats,
   InsertSupportMessage, supportMessages,
-  InsertFaqArticle, faqArticles, FaqArticle
+  InsertFaqArticle, faqArticles, FaqArticle,
+  InsertBusinessProcessVersion, businessProcessVersions
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -739,4 +740,18 @@ export async function updateUserPassword(userId: number, passwordHash: string): 
   if (!db) throw new Error("Database not available");
 
   await db.update(users).set({ passwordHash }).where(eq(users.id, userId));
+}
+
+// Business Process Versions
+export async function createBusinessProcessVersion(version: InsertBusinessProcessVersion) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(businessProcessVersions).values(version).returning({ id: businessProcessVersions.id });
+  return result[0].id;
+}
+
+export async function getBusinessProcessVersions(processId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(businessProcessVersions).where(eq(businessProcessVersions.businessProcessId, processId)).orderBy(businessProcessVersions.version);
 }
