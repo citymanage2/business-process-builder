@@ -93,6 +93,15 @@ export default function ProcessDiagramEditable({ steps: initialSteps, roles, sta
     
     const newRoleId = roleMatch[1];
     const newStageId = stageMatch[1];
+    
+    // Логирование для диагностики
+    const draggedStep = steps.find(s => s.id === active.id);
+    console.log("[DRAG] Dragged step:", draggedStep);
+    console.log("[DRAG] Old roleId/stageId:", draggedStep?.roleId, draggedStep?.stageId, "types:", typeof draggedStep?.roleId, typeof draggedStep?.stageId);
+    console.log("[DRAG] New roleId/stageId:", newRoleId, newStageId, "types:", typeof newRoleId, typeof newStageId);
+    console.log("[DRAG] All steps before update:", steps.length);
+    console.log("[DRAG] Available roles:", roles.map(r => ({ id: r.id, type: typeof r.id })));
+    console.log("[DRAG] Available stages:", stages.map(s => ({ id: s.id, type: typeof s.id })));
 
     // Обновляем шаг и сохраняем в БД
     setSteps((prevSteps) => {
