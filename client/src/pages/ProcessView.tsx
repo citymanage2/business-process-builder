@@ -27,7 +27,8 @@ export default function ProcessView() {
   const updateProcessMutation = trpc.processes.update.useMutation({
     onSuccess: () => {
       toast.success("Изменения сохранены");
-      refetch();
+      // Убран refetch() чтобы избежать перезаписи локального состояния при drag and drop
+      // refetch(); - приводило к удалению блоков
       // Не выходим из режима редактирования при автосохранении
       // setEditMode(false); - убрано, теперь выход только по кнопке
     },
