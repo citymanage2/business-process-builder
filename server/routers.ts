@@ -45,6 +45,35 @@ import {
   updateFaqArticle,
   deleteFaqArticle,
   getFaqArticleById,
+  // Process Builder additions
+  createProcessTemplate,
+  getPublicTemplates,
+  getUserTemplates,
+  getTemplateById,
+  updateProcessTemplate,
+  deleteProcessTemplate,
+  incrementTemplateUsage,
+  createProcessVersion,
+  getProcessVersions,
+  getProcessVersion,
+  getLatestVersionNumber,
+  createProcessPermission,
+  getProcessPermissions,
+  getUserProcessPermission,
+  updateProcessPermission,
+  deleteProcessPermission,
+  getSharedProcesses,
+  createUserCategory,
+  getUserCategories,
+  updateUserCategory,
+  deleteUserCategory,
+  createNotification,
+  getUserNotifications,
+  getUnreadNotificationsCount as getUnreadNotificationsCountDb,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
+  deleteNotification,
+  getAllUserProcesses,
 } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { transcribeAudio } from "./_core/voiceTranscription";
@@ -785,6 +814,500 @@ export const appRouter = router({
         }
         await deleteFaqArticle(input.id);
         return { success: true };
+      }),
+  }),
+
+  // Process Templates
+  templates: router({
+    // Get all public and built-in templates
+    getPublic: publicProcedure.query(async () => {
+      return await getPublicTemplates();
+    }),
+
+    // Get user's own templates
+    getMy: protectedProcedure.query(async ({ ctx }) => {
+      return await getUserTemplates(ctx.user.id);
+    }),
+
+    // Get template by ID
+    getById: publicProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        return await getTemplateById(input.id);
+      }),
+
+    // Create new template
+    create: protectedProcedure
+      .input(z.object({
+        name: z.string(),
+        description: z.string().optional(),
+        category: z.string().optional(),
+        tags: z.string().optional(),
+        diagramData: z.string(),
+        isPublic: z.number().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const id = await createProcessTemplate({
+          userId: ctx.user.id,
+          name: input.name,
+          description: input.description,
+          category: input.category,
+          tags: input.tags,
+          diagramData: input.diagramData,
+          isPublic: input.isPublic || 0,
+        });
+        return { id };
+      }),
+
+    // Update template
+    update: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().optional(),
+        description: z.string().optional(),
+        category: z.string().optional(),
+        tags: z.string().optional(),
+        diagramData: z.string().optional(),
+        isPublic: z.number().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const template = await getTemplateById(input.id);
+        if (!template || template.userId !== ctx.user.id) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized to update this template' });
+        }
+        const { id, ...data } = input;
+        await updateProcessTemplate(id, data);
+        return { success: true };
+      }),
+
+    // Delete template
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const template = await getTemplateById(input.id);
+        if (!template || template.userId !== ctx.user.id) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized to delete this template' });
+        }
+        await deleteProcessTemplate(input.id);
+        return { success: true };
+      }),
+
+    // Record template usage
+    recordUsage: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await incrementTemplateUsage(input.id);
+        return { success: true };
+      }),
+  }),
+
+  // Process Versions
+  versions: router({
+    // Get all versions for a process
+    list: protectedProcedure
+      .input(z.object({ processId: z.number() }))
+      .query(async ({ input }) => {
+        return await getProcessVersions(input.processId);
+      }),
+
+    // Get specific version
+    get: protectedProcedure
+      .input(z.object({ processId: z.number(), version: z.number() }))
+      .query(async ({ input }) => {
+        return await getProcessVersion(input.processId, input.version);
+      }),
+
+    // Create new version (snapshot)
+    create: protectedProcedure
+      .input(z.object({
+        processId: z.number(),
+        snapshotData: z.string(),
+        changeDescription: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const latestVersion = await getLatestVersionNumber(input.processId);
+        const id = await createProcessVersion({
+          processId: input.processId,
+          version: latestVersion + 1,
+          snapshotData: input.snapshotData,
+          changeDescription: input.changeDescription,
+          createdBy: ctx.user.id,
+        });
+        return { id, version: latestVersion + 1 };
+      }),
+
+    // Revert to a specific version
+    revert: protectedProcedure
+      .input(z.object({ processId: z.number(), version: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const versionData = await getProcessVersion(input.processId, input.version);
+        if (!versionData) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Version not found' });
+        }
+        
+        // Create a new version with the old data
+        const latestVersion = await getLatestVersionNumber(input.processId);
+        await createProcessVersion({
+          processId: input.processId,
+          version: latestVersion + 1,
+          snapshotData: versionData.snapshotData,
+          changeDescription: `Reverted to version ${input.version}`,
+          createdBy: ctx.user.id,
+        });
+        
+        // Update the process with the old data
+        const snapshot = JSON.parse(versionData.snapshotData);
+        await updateBusinessProcess(input.processId, {
+          diagramData: versionData.snapshotData,
+          title: snapshot.title,
+          description: snapshot.description,
+        });
+        
+        return { success: true };
+      }),
+  }),
+
+  // Process Permissions (Collaboration)
+  permissions: router({
+    // Get permissions for a process
+    list: protectedProcedure
+      .input(z.object({ processId: z.number() }))
+      .query(async ({ input }) => {
+        return await getProcessPermissions(input.processId);
+      }),
+
+    // Add permission
+    add: protectedProcedure
+      .input(z.object({
+        processId: z.number(),
+        userId: z.number(),
+        permissionLevel: z.enum(['editor', 'viewer', 'commenter']),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        // Check if user has permission to add permissions
+        const existingPerm = await getUserProcessPermission(input.processId, ctx.user.id);
+        if (!existingPerm || existingPerm.permissionLevel !== 'owner') {
+          // Check if process belongs to user's company
+          const process = await getProcessById(input.processId);
+          if (!process) {
+            throw new TRPCError({ code: 'NOT_FOUND', message: 'Process not found' });
+          }
+          const company = await getCompanyById(process.companyId);
+          if (!company || company.userId !== ctx.user.id) {
+            throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
+          }
+        }
+        
+        const id = await createProcessPermission({
+          processId: input.processId,
+          userId: input.userId,
+          permissionLevel: input.permissionLevel,
+          invitedBy: ctx.user.id,
+        });
+        
+        // Create notification for the invited user
+        await createNotification({
+          userId: input.userId,
+          type: 'invite',
+          title: 'Приглашение к совместной работе',
+          content: `Вас пригласили работать над процессом`,
+          relatedProcessId: input.processId,
+        });
+        
+        return { id };
+      }),
+
+    // Update permission level
+    update: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        permissionLevel: z.enum(['editor', 'viewer', 'commenter']),
+      }))
+      .mutation(async ({ input }) => {
+        await updateProcessPermission(input.id, input.permissionLevel);
+        return { success: true };
+      }),
+
+    // Remove permission
+    remove: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await deleteProcessPermission(input.id);
+        return { success: true };
+      }),
+
+    // Get processes shared with user
+    sharedWithMe: protectedProcedure.query(async ({ ctx }) => {
+      return await getSharedProcesses(ctx.user.id);
+    }),
+  }),
+
+  // User Categories
+  categories: router({
+    // Get user's categories
+    list: protectedProcedure.query(async ({ ctx }) => {
+      return await getUserCategories(ctx.user.id);
+    }),
+
+    // Create category
+    create: protectedProcedure
+      .input(z.object({
+        name: z.string(),
+        parentId: z.number().optional(),
+        color: z.string().optional(),
+        order: z.number().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const id = await createUserCategory({
+          userId: ctx.user.id,
+          ...input,
+        });
+        return { id };
+      }),
+
+    // Update category
+    update: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().optional(),
+        parentId: z.number().optional(),
+        color: z.string().optional(),
+        order: z.number().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { id, ...data } = input;
+        await updateUserCategory(id, data);
+        return { success: true };
+      }),
+
+    // Delete category
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await deleteUserCategory(input.id);
+        return { success: true };
+      }),
+  }),
+
+  // Notifications
+  notifications: router({
+    // Get user's notifications
+    list: protectedProcedure
+      .input(z.object({ limit: z.number().optional() }))
+      .query(async ({ ctx, input }) => {
+        return await getUserNotifications(ctx.user.id, input.limit || 50);
+      }),
+
+    // Get unread count
+    unreadCount: protectedProcedure.query(async ({ ctx }) => {
+      return await getUnreadNotificationsCountDb(ctx.user.id);
+    }),
+
+    // Mark as read
+    markAsRead: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await markNotificationAsRead(input.id);
+        return { success: true };
+      }),
+
+    // Mark all as read
+    markAllAsRead: protectedProcedure.mutation(async ({ ctx }) => {
+      await markAllNotificationsAsRead(ctx.user.id);
+      return { success: true };
+    }),
+
+    // Delete notification
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await deleteNotification(input.id);
+        return { success: true };
+      }),
+  }),
+
+  // Extended process operations
+  processBuilder: router({
+    // Get all user's processes across all companies
+    getAllMy: protectedProcedure.query(async ({ ctx }) => {
+      const processes = await getAllUserProcesses(ctx.user.id);
+      return processes.map(p => ({
+        ...p,
+        stages: p.stages ? JSON.parse(p.stages) : [],
+        roles: p.roles ? JSON.parse(p.roles) : [],
+        steps: p.steps ? JSON.parse(p.steps) : [],
+        diagramData: p.diagramData ? JSON.parse(p.diagramData) : null,
+      }));
+    }),
+
+    // Create new process from builder
+    create: protectedProcedure
+      .input(z.object({
+        companyId: z.number(),
+        title: z.string(),
+        description: z.string().optional(),
+        diagramData: z.string(),
+        category: z.string().optional(),
+        tags: z.string().optional(),
+        visibility: z.enum(['private', 'public']).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        // Verify company belongs to user
+        const company = await getCompanyById(input.companyId);
+        if (!company || company.userId !== ctx.user.id) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized to create process in this company' });
+        }
+
+        // Parse diagram data to extract process info
+        let diagramObj;
+        try {
+          diagramObj = JSON.parse(input.diagramData);
+        } catch (e) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid diagram data' });
+        }
+
+        const id = await createBusinessProcess({
+          companyId: input.companyId,
+          title: input.title,
+          description: input.description,
+          diagramData: input.diagramData,
+          stages: diagramObj.stages ? JSON.stringify(diagramObj.stages) : null,
+          roles: diagramObj.roles ? JSON.stringify(diagramObj.roles) : null,
+          steps: JSON.stringify(diagramObj.blocks || []),
+          branches: diagramObj.connections ? JSON.stringify(diagramObj.connections) : null,
+          status: 'draft',
+        });
+
+        // Create initial version
+        await createProcessVersion({
+          processId: id,
+          version: 1,
+          snapshotData: input.diagramData,
+          changeDescription: 'Initial version',
+          createdBy: ctx.user.id,
+        });
+
+        return { id };
+      }),
+
+    // Save process with version control
+    saveWithVersion: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        title: z.string().optional(),
+        description: z.string().optional(),
+        diagramData: z.string(),
+        changeDescription: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const process = await getProcessById(input.id);
+        if (!process) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Process not found' });
+        }
+
+        // Parse diagram data
+        let diagramObj;
+        try {
+          diagramObj = JSON.parse(input.diagramData);
+        } catch (e) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid diagram data' });
+        }
+
+        // Update process
+        await updateBusinessProcess(input.id, {
+          title: input.title,
+          description: input.description,
+          diagramData: input.diagramData,
+          stages: diagramObj.stages ? JSON.stringify(diagramObj.stages) : null,
+          roles: diagramObj.roles ? JSON.stringify(diagramObj.roles) : null,
+          steps: JSON.stringify(diagramObj.blocks || []),
+          branches: diagramObj.connections ? JSON.stringify(diagramObj.connections) : null,
+        });
+
+        // Create new version
+        const latestVersion = await getLatestVersionNumber(input.id);
+        await createProcessVersion({
+          processId: input.id,
+          version: latestVersion + 1,
+          snapshotData: input.diagramData,
+          changeDescription: input.changeDescription || `Saved at ${new Date().toLocaleString()}`,
+          createdBy: ctx.user.id,
+        });
+
+        return { success: true, version: latestVersion + 1 };
+      }),
+
+    // Duplicate process
+    duplicate: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        newTitle: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const original = await getProcessById(input.id);
+        if (!original) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Process not found' });
+        }
+
+        // Verify user has access (owner or editor)
+        const company = await getCompanyById(original.companyId);
+        if (!company || company.userId !== ctx.user.id) {
+          const permission = await getUserProcessPermission(input.id, ctx.user.id);
+          if (!permission || permission.permissionLevel === 'viewer') {
+            throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized to duplicate this process' });
+          }
+        }
+
+        // Create duplicate
+        const newTitle = input.newTitle || `${original.title} (копия)`;
+        const id = await createBusinessProcess({
+          ...original,
+          id: undefined,
+          title: newTitle,
+          status: 'draft',
+          createdAt: undefined,
+          updatedAt: undefined,
+        });
+
+        // Create initial version for duplicate
+        if (original.diagramData) {
+          await createProcessVersion({
+            processId: id,
+            version: 1,
+            snapshotData: original.diagramData,
+            changeDescription: `Duplicated from "${original.title}"`,
+            createdBy: ctx.user.id,
+          });
+        }
+
+        return { id };
+      }),
+
+    // Save as template
+    saveAsTemplate: protectedProcedure
+      .input(z.object({
+        processId: z.number(),
+        name: z.string(),
+        description: z.string().optional(),
+        category: z.string().optional(),
+        isPublic: z.boolean().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const process = await getProcessById(input.processId);
+        if (!process || !process.diagramData) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Process not found or has no diagram data' });
+        }
+
+        const id = await createProcessTemplate({
+          userId: ctx.user.id,
+          name: input.name,
+          description: input.description,
+          category: input.category,
+          diagramData: process.diagramData,
+          isPublic: input.isPublic ? 1 : 0,
+        });
+
+        return { id };
       }),
   }),
 });

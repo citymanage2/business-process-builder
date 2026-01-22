@@ -224,4 +224,91 @@ export const faqArticles = pgTable("faq_articles", {
 export type FaqArticle = typeof faqArticles.$inferSelect;
 export type InsertFaqArticle = typeof faqArticles.$inferInsert;
 
+// Process visibility enum
+export const visibilityEnum = pgEnum("visibility", ["private", "public"]);
+
+// Process Builder - Templates table
+export const processTemplates = pgTable("process_templates", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id, { onDelete: "set null" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  category: varchar("category", { length: 100 }),
+  tags: text("tags"), // JSON array of tags
+  diagramData: text("diagram_data").notNull(), // Full process structure JSON
+  isPublic: integer("is_public").default(0).notNull(), // 0 = private, 1 = public
+  isBuiltIn: integer("is_built_in").default(0).notNull(), // 1 = predefined template
+  usageCount: integer("usage_count").default(0).notNull(),
+  rating: integer("rating").default(0), // Average rating (0-50 stored as integer, displayed as 0-5)
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type ProcessTemplate = typeof processTemplates.$inferSelect;
+export type InsertProcessTemplate = typeof processTemplates.$inferInsert;
+
+// Process Versions for version control
+export const processVersions = pgTable("process_versions", {
+  id: serial("id").primaryKey(),
+  processId: integer("process_id").notNull().references(() => businessProcesses.id, { onDelete: "cascade" }),
+  version: integer("version").notNull(),
+  snapshotData: text("snapshot_data").notNull(), // Full process state JSON
+  changeDescription: text("change_description"),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type ProcessVersion = typeof processVersions.$inferSelect;
+export type InsertProcessVersion = typeof processVersions.$inferInsert;
+
+// Process Permissions for collaboration
+export const permissionLevelEnum = pgEnum("permission_level", ["owner", "editor", "viewer", "commenter"]);
+
+export const processPermissions = pgTable("process_permissions", {
+  id: serial("id").primaryKey(),
+  processId: integer("process_id").notNull().references(() => businessProcesses.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  permissionLevel: permissionLevelEnum("permission_level").notNull(),
+  invitedBy: integer("invited_by").references(() => users.id, { onDelete: "set null" }),
+  inviteToken: varchar("invite_token", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type ProcessPermission = typeof processPermissions.$inferSelect;
+export type InsertProcessPermission = typeof processPermissions.$inferInsert;
+
+// User Categories for organizing processes
+export const userCategories = pgTable("user_categories", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 100 }).notNull(),
+  parentId: integer("parent_id").references((): any => userCategories.id, { onDelete: "set null" }),
+  color: varchar("color", { length: 20 }),
+  order: integer("order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type UserCategory = typeof userCategories.$inferSelect;
+export type InsertUserCategory = typeof userCategories.$inferInsert;
+
+// Process Notifications
+export const notificationTypeEnum = pgEnum("notification_type", [
+  "invite", "comment", "mention", "change", "deadline", "system"
+]);
+
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: notificationTypeEnum("type").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  content: text("content"),
+  relatedProcessId: integer("related_process_id").references(() => businessProcesses.id, { onDelete: "cascade" }),
+  relatedCommentId: integer("related_comment_id").references(() => comments.id, { onDelete: "cascade" }),
+  isRead: integer("is_read").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = typeof notifications.$inferInsert;
+
 

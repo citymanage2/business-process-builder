@@ -21,11 +21,15 @@ import CompanyProcesses from "./pages/CompanyProcesses";
 import Admin from "./pages/Admin";
 import AdminSupport from "./pages/AdminSupport";
 import SupportChat from "./components/SupportChat";
+import ProcessBuilder from "./pages/ProcessBuilder";
+import ProcessList from "./pages/ProcessList";
+import Templates from "./pages/Templates";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
   return (
-    <Switch>      <Route path={"/"} component={Home} />
+    <Switch>
+      <Route path={"/"} component={Home} />
       <Route path={"/login"} component={Login} />
       <Route path={"/verify-email"} component={VerifyEmail} />
       <Route path={"/reset-password"} component={ResetPassword} />
@@ -42,7 +46,11 @@ function Router() {
       <Route path="/company/:id/processes" component={CompanyProcesses} />
       <Route path="/admin" component={Admin} />
       <Route path="/admin/support" component={AdminSupport} />
-      <Route path={"/404"} component={NotFound} />
+      {/* Process Builder Routes */}
+      <Route path="/processes" component={ProcessList} />
+      <Route path="/builder" component={ProcessBuilder} />
+      <Route path="/builder/:id" component={ProcessBuilder} />
+      <Route path="/templates" component={Templates} />
       {/* Final fallback route */}
       <Route component={NotFound} />
     </Switch>

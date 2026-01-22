@@ -1,4 +1,4 @@
-import { eq, like, and, or } from "drizzle-orm";
+import { eq, like, and, or, desc, asc, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { 
@@ -12,7 +12,12 @@ import {
   InsertErrorLog, errorLogs,
   InsertSupportChat, supportChats,
   InsertSupportMessage, supportMessages,
-  InsertFaqArticle, faqArticles, FaqArticle
+  InsertFaqArticle, faqArticles, FaqArticle,
+  InsertProcessTemplate, processTemplates, ProcessTemplate,
+  InsertProcessVersion, processVersions,
+  InsertProcessPermission, processPermissions,
+  InsertUserCategory, userCategories,
+  InsertNotification, notifications
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -739,4 +744,307 @@ export async function updateUserPassword(userId: number, passwordHash: string): 
   if (!db) throw new Error("Database not available");
 
   await db.update(users).set({ passwordHash }).where(eq(users.id, userId));
+}
+
+// ==================== Process Templates ====================
+
+export async function createProcessTemplate(template: InsertProcessTemplate): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.insert(processTemplates).values(template).returning({ id: processTemplates.id });
+  return result[0].id;
+}
+
+export async function getPublicTemplates(): Promise<ProcessTemplate[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  return await db.select()
+    .from(processTemplates)
+    .where(or(eq(processTemplates.isPublic, 1), eq(processTemplates.isBuiltIn, 1)))
+    .orderBy(desc(processTemplates.usageCount));
+}
+
+export async function getUserTemplates(userId: number): Promise<ProcessTemplate[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  return await db.select()
+    .from(processTemplates)
+    .where(eq(processTemplates.userId, userId))
+    .orderBy(desc(processTemplates.updatedAt));
+}
+
+export async function getTemplateById(id: number): Promise<ProcessTemplate | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  
+  const result = await db.select()
+    .from(processTemplates)
+    .where(eq(processTemplates.id, id))
+    .limit(1);
+  return result[0];
+}
+
+export async function updateProcessTemplate(id: number, data: Partial<InsertProcessTemplate>): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.update(processTemplates)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(processTemplates.id, id));
+}
+
+export async function deleteProcessTemplate(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.delete(processTemplates).where(eq(processTemplates.id, id));
+}
+
+export async function incrementTemplateUsage(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.update(processTemplates)
+    .set({ usageCount: sql`${processTemplates.usageCount} + 1` })
+    .where(eq(processTemplates.id, id));
+}
+
+// ==================== Process Versions ====================
+
+export async function createProcessVersion(version: InsertProcessVersion): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.insert(processVersions).values(version).returning({ id: processVersions.id });
+  return result[0].id;
+}
+
+export async function getProcessVersions(processId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  return await db.select()
+    .from(processVersions)
+    .where(eq(processVersions.processId, processId))
+    .orderBy(desc(processVersions.version));
+}
+
+export async function getProcessVersion(processId: number, versionNumber: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  
+  const result = await db.select()
+    .from(processVersions)
+    .where(and(
+      eq(processVersions.processId, processId),
+      eq(processVersions.version, versionNumber)
+    ))
+    .limit(1);
+  return result[0];
+}
+
+export async function getLatestVersionNumber(processId: number): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  
+  const result = await db.select({ maxVersion: sql<number>`MAX(${processVersions.version})` })
+    .from(processVersions)
+    .where(eq(processVersions.processId, processId));
+  
+  return result[0]?.maxVersion || 0;
+}
+
+// ==================== Process Permissions ====================
+
+export async function createProcessPermission(permission: InsertProcessPermission): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.insert(processPermissions).values(permission).returning({ id: processPermissions.id });
+  return result[0].id;
+}
+
+export async function getProcessPermissions(processId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  return await db.select({
+    id: processPermissions.id,
+    processId: processPermissions.processId,
+    userId: processPermissions.userId,
+    permissionLevel: processPermissions.permissionLevel,
+    invitedBy: processPermissions.invitedBy,
+    createdAt: processPermissions.createdAt,
+    userName: users.name,
+    userEmail: users.email,
+  })
+    .from(processPermissions)
+    .leftJoin(users, eq(processPermissions.userId, users.id))
+    .where(eq(processPermissions.processId, processId));
+}
+
+export async function getUserProcessPermission(processId: number, userId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  
+  const result = await db.select()
+    .from(processPermissions)
+    .where(and(
+      eq(processPermissions.processId, processId),
+      eq(processPermissions.userId, userId)
+    ))
+    .limit(1);
+  return result[0];
+}
+
+export async function updateProcessPermission(id: number, permissionLevel: string): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.update(processPermissions)
+    .set({ permissionLevel: permissionLevel as any })
+    .where(eq(processPermissions.id, id));
+}
+
+export async function deleteProcessPermission(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.delete(processPermissions).where(eq(processPermissions.id, id));
+}
+
+export async function getSharedProcesses(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  return await db.select({
+    processId: processPermissions.processId,
+    permissionLevel: processPermissions.permissionLevel,
+    processTitle: businessProcesses.title,
+    processDescription: businessProcesses.description,
+    processStatus: businessProcesses.status,
+    createdAt: businessProcesses.createdAt,
+    updatedAt: businessProcesses.updatedAt,
+  })
+    .from(processPermissions)
+    .innerJoin(businessProcesses, eq(processPermissions.processId, businessProcesses.id))
+    .where(eq(processPermissions.userId, userId));
+}
+
+// ==================== User Categories ====================
+
+export async function createUserCategory(category: InsertUserCategory): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.insert(userCategories).values(category).returning({ id: userCategories.id });
+  return result[0].id;
+}
+
+export async function getUserCategories(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  return await db.select()
+    .from(userCategories)
+    .where(eq(userCategories.userId, userId))
+    .orderBy(asc(userCategories.order));
+}
+
+export async function updateUserCategory(id: number, data: Partial<InsertUserCategory>): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.update(userCategories).set(data).where(eq(userCategories.id, id));
+}
+
+export async function deleteUserCategory(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.delete(userCategories).where(eq(userCategories.id, id));
+}
+
+// ==================== Notifications ====================
+
+export async function createNotification(notification: InsertNotification): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.insert(notifications).values(notification).returning({ id: notifications.id });
+  return result[0].id;
+}
+
+export async function getUserNotifications(userId: number, limit = 50) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  return await db.select()
+    .from(notifications)
+    .where(eq(notifications.userId, userId))
+    .orderBy(desc(notifications.createdAt))
+    .limit(limit);
+}
+
+export async function getUnreadNotificationsCount(userId: number): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  
+  const result = await db.select({ count: sql<number>`COUNT(*)` })
+    .from(notifications)
+    .where(and(eq(notifications.userId, userId), eq(notifications.isRead, 0)));
+  
+  return result[0]?.count || 0;
+}
+
+export async function markNotificationAsRead(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.update(notifications)
+    .set({ isRead: 1 })
+    .where(eq(notifications.id, id));
+}
+
+export async function markAllNotificationsAsRead(userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.update(notifications)
+    .set({ isRead: 1 })
+    .where(eq(notifications.userId, userId));
+}
+
+export async function deleteNotification(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.delete(notifications).where(eq(notifications.id, id));
+}
+
+// ==================== All User Processes ====================
+
+export async function getAllUserProcesses(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  // Get companies owned by user
+  const userCompanies = await db.select()
+    .from(companies)
+    .where(eq(companies.userId, userId));
+  
+  if (userCompanies.length === 0) return [];
+  
+  const companyIds = userCompanies.map(c => c.id);
+  
+  // Get all processes for user's companies
+  const processes = await db.select()
+    .from(businessProcesses)
+    .where(sql`${businessProcesses.companyId} IN ${companyIds}`)
+    .orderBy(desc(businessProcesses.updatedAt));
+  
+  return processes;
 }
