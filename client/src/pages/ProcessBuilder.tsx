@@ -28,7 +28,9 @@ import {
   History,
   Menu,
   X,
+  Share2,
 } from 'lucide-react';
+import ShareDialog from '@/components/ProcessBuilder/ShareDialog';
 import { toPng, toSvg } from 'html-to-image';
 
 export default function ProcessBuilder() {
@@ -42,6 +44,7 @@ export default function ProcessBuilder() {
   const [isSaving, setIsSaving] = useState(false);
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
   
   // Store state
@@ -311,6 +314,17 @@ export default function ProcessBuilder() {
         </div>
         
         <div className="flex items-center gap-2">
+          {processId && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShareDialogOpen(true)}
+              className="gap-2"
+            >
+              <Share2 className="w-4 h-4" />
+              Поделиться
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -321,6 +335,17 @@ export default function ProcessBuilder() {
           </Button>
         </div>
       </header>
+      
+      {/* Share Dialog */}
+      {processId && (
+        <ShareDialog
+          processId={processId}
+          processName={processName}
+          isOpen={shareDialogOpen}
+          onClose={() => setShareDialogOpen(false)}
+          language="ru"
+        />
+      )}
       
       {/* Toolbar */}
       <Toolbar
