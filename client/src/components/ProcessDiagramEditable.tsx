@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -53,10 +53,11 @@ export default function ProcessDiagramEditable({ steps: initialSteps, roles, sta
   const [steps, setSteps] = useState(initialSteps);
   const [activeId, setActiveId] = useState<string | null>(null);
 
-  // Синхронизируем локальное состояние с props при изменении initialSteps
-  useEffect(() => {
-    setSteps(initialSteps);
-  }, [initialSteps]);
+  // УБРАН useEffect который перезаписывал локальное состояние после drag and drop
+  // useEffect(() => {
+  //   setSteps(initialSteps);
+  // }, [initialSteps]);
+  // Проблема: при перерисовке родителя initialSteps менялся и перезаписывал локальные изменения
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
