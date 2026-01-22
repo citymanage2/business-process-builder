@@ -55,6 +55,7 @@ import {
   ChevronLeft,
   FileText,
   Sparkles,
+  BarChart3,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
@@ -221,13 +222,21 @@ export default function Processes() {
               </div>
             </div>
             
-            <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="gap-2">
-                  <Plus className="w-4 h-4" />
-                  Создать процесс
+            <div className="flex items-center gap-2">
+              <Link href="/analytics">
+                <Button variant="outline" className="gap-2">
+                  <BarChart3 className="w-4 h-4" />
+                  Аналитика
                 </Button>
-              </DialogTrigger>
+              </Link>
+              
+              <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button className="gap-2">
+                    <Plus className="w-4 h-4" />
+                    Создать процесс
+                  </Button>
+                </DialogTrigger>
               <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                   <DialogTitle>Создать новый процесс</DialogTitle>

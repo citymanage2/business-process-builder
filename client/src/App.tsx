@@ -23,6 +23,7 @@ import AdminSupport from "./pages/AdminSupport";
 import SupportChat from "./components/SupportChat";
 import Processes from "./pages/Processes";
 import ProcessBuilder from "./pages/ProcessBuilder";
+import Analytics from "./pages/Analytics";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -49,6 +50,7 @@ function Router() {
       <Route path="/processes" component={Processes} />
       <Route path="/builder" component={ProcessBuilder} />
       <Route path="/builder/:id" component={ProcessBuilder} />
+      <Route path="/analytics" component={Analytics} />
       {/* Final fallback route */}
       <Route component={NotFound} />
     </Switch>

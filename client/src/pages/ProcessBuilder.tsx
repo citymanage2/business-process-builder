@@ -16,6 +16,8 @@ import ProcessCanvas from '@/components/ProcessBuilder/ProcessCanvas';
 import BlockLibrary from '@/components/ProcessBuilder/BlockLibrary';
 import PropertiesPanel from '@/components/ProcessBuilder/PropertiesPanel';
 import Toolbar from '@/components/ProcessBuilder/Toolbar';
+import VersionsPanel from '@/components/ProcessBuilder/VersionsPanel';
+import CommentsPanel from '@/components/ProcessBuilder/CommentsPanel';
 import { BlockDefinition } from '@shared/processBuilder';
 import { toast } from 'sonner';
 import {
@@ -409,16 +411,12 @@ export default function ProcessBuilder() {
                   <PropertiesPanel nodeId={selectedBlockForProperties} language="ru" />
                 </TabsContent>
                 
-                <TabsContent value="comments" className="flex-1 m-0 p-4">
-                  <div className="text-center text-muted-foreground text-sm">
-                    Комментарии к процессу будут здесь
-                  </div>
+                <TabsContent value="comments" className="flex-1 m-0 overflow-hidden">
+                  <CommentsPanel processId={processId} language="ru" />
                 </TabsContent>
                 
-                <TabsContent value="versions" className="flex-1 m-0 p-4">
-                  <div className="text-center text-muted-foreground text-sm">
-                    История версий будет здесь
-                  </div>
+                <TabsContent value="versions" className="flex-1 m-0 overflow-hidden">
+                  <VersionsPanel processId={processId} language="ru" />
                 </TabsContent>
               </Tabs>
             </div>
