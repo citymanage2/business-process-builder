@@ -1,4 +1,17 @@
-import { integer, pgEnum, pgTable, text, timestamp, varchar, serial } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  doublePrecision,
+  integer,
+  numeric,
+  pgEnum,
+  pgTable,
+  primaryKey,
+  serial,
+  text,
+  timestamp,
+  uniqueIndex,
+  varchar,
+} from "drizzle-orm/pg-core";
 
 /**
  * Core user table backing auth flow.
@@ -16,6 +29,12 @@ export const categoryEnum = pgEnum("category", ["optimization", "automation", "r
 export const priorityEnum = pgEnum("priority", ["high", "medium", "low"]);
 export const chatStatusEnum = pgEnum("chat_status", ["open", "closed"]);
 export const senderRoleEnum = pgEnum("sender_role", ["user", "admin"]);
+export const bpProcessStatusEnum = pgEnum("bp_process_status", ["draft", "published", "archived"]);
+export const bpVisibilityEnum = pgEnum("bp_visibility", ["private", "public"]);
+export const bpConnectionTypeEnum = pgEnum("bp_connection_type", ["sequence", "data", "conditional"]);
+export const bpCollaboratorRoleEnum = pgEnum("bp_collaborator_role", ["owner", "editor", "viewer", "commenter"]);
+export const bpThemeEnum = pgEnum("bp_theme", ["light", "dark", "auto"]);
+export const bpNotificationFrequencyEnum = pgEnum("bp_notification_frequency", ["instant", "daily", "weekly"]);
 
 
 export const users = pgTable("users", {
@@ -224,4 +243,192 @@ export const faqArticles = pgTable("faq_articles", {
 export type FaqArticle = typeof faqArticles.$inferSelect;
 export type InsertFaqArticle = typeof faqArticles.$inferInsert;
 
+// ====================
+// Business Process Builder (bp_) tables
+// ====================
+
+export const bpCategories = pgTable("bp_categories", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 100 }).notNull().unique(),
+  description: text("description"),
+  parentId: integer("parent_id").references(() => bpCategories.id, { onDelete: "set null" }),
+  color: varchar("color", { length: 7 }),
+  icon: varchar("icon", { length: 50 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type BpCategory = typeof bpCategories.$inferSelect;
+export type InsertBpCategory = typeof bpCategories.$inferInsert;
+
+export const bpTags = pgTable("bp_tags", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 50 }).notNull().unique(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type BpTag = typeof bpTags.$inferSelect;
+export type InsertBpTag = typeof bpTags.$inferInsert;
+
+export const bpProcesses = pgTable("bp_processes", {
+  id: serial("id").primaryKey(),
+  ownerId: integer("owner_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  categoryId: integer("category_id").references(() => bpCategories.id, { onDelete: "set null" }),
+  status: bpProcessStatusEnum("status").default("draft").notNull(),
+  visibility: bpVisibilityEnum("visibility").default("private").notNull(),
+  thumbnail: text("thumbnail"),
+  viewCount: integer("view_count").default(0).notNull(),
+  version: integer("version").default(1).notNull(),
+  content: text("content"),
+  archivedAt: timestamp("archived_at"),
+  deletedAt: timestamp("deleted_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type BpProcess = typeof bpProcesses.$inferSelect;
+export type InsertBpProcess = typeof bpProcesses.$inferInsert;
+
+export const bpProcessVersions = pgTable("bp_process_versions", {
+  id: serial("id").primaryKey(),
+  processId: integer("process_id").notNull().references(() => bpProcesses.id, { onDelete: "cascade" }),
+  versionNumber: integer("version_number").notNull(),
+  content: text("content").notNull(),
+  comment: text("comment"),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type BpProcessVersion = typeof bpProcessVersions.$inferSelect;
+export type InsertBpProcessVersion = typeof bpProcessVersions.$inferInsert;
+
+export const bpProcessBlocks = pgTable(
+  "bp_process_blocks",
+  {
+    id: serial("id").primaryKey(),
+    processId: integer("process_id").notNull().references(() => bpProcesses.id, { onDelete: "cascade" }),
+    blockId: varchar("block_id", { length: 100 }).notNull(),
+    type: varchar("type", { length: 50 }).notNull(),
+    title: varchar("title", { length: 255 }).notNull(),
+    description: text("description"),
+    properties: text("properties"),
+    positionX: doublePrecision("position_x"),
+    positionY: doublePrecision("position_y"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  table => ({
+    processBlockUnique: uniqueIndex("bp_process_blocks_process_block_unique").on(
+      table.processId,
+      table.blockId,
+    ),
+  }),
+);
+
+export type BpProcessBlock = typeof bpProcessBlocks.$inferSelect;
+export type InsertBpProcessBlock = typeof bpProcessBlocks.$inferInsert;
+
+export const bpProcessConnections = pgTable("bp_process_connections", {
+  id: serial("id").primaryKey(),
+  processId: integer("process_id").notNull().references(() => bpProcesses.id, { onDelete: "cascade" }),
+  sourceBlockId: varchar("source_block_id", { length: 100 }).notNull(),
+  targetBlockId: varchar("target_block_id", { length: 100 }).notNull(),
+  type: bpConnectionTypeEnum("type").notNull(),
+  label: varchar("label", { length: 255 }),
+  properties: text("properties"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type BpProcessConnection = typeof bpProcessConnections.$inferSelect;
+export type InsertBpProcessConnection = typeof bpProcessConnections.$inferInsert;
+
+export const bpProcessTags = pgTable(
+  "bp_process_tags",
+  {
+    processId: integer("process_id").notNull().references(() => bpProcesses.id, { onDelete: "cascade" }),
+    tagId: integer("tag_id").notNull().references(() => bpTags.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  table => ({
+    pk: primaryKey({ columns: [table.processId, table.tagId] }),
+  }),
+);
+
+export type BpProcessTag = typeof bpProcessTags.$inferSelect;
+export type InsertBpProcessTag = typeof bpProcessTags.$inferInsert;
+
+export const bpProcessCollaborators = pgTable("bp_process_collaborators", {
+  id: serial("id").primaryKey(),
+  processId: integer("process_id").notNull().references(() => bpProcesses.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  role: bpCollaboratorRoleEnum("role").default("viewer").notNull(),
+  invitedBy: integer("invited_by").references(() => users.id, { onDelete: "set null" }),
+  invitedAt: timestamp("invited_at").defaultNow().notNull(),
+  acceptedAt: timestamp("accepted_at"),
+});
+
+export type BpProcessCollaborator = typeof bpProcessCollaborators.$inferSelect;
+export type InsertBpProcessCollaborator = typeof bpProcessCollaborators.$inferInsert;
+
+export const bpComments = pgTable("bp_comments", {
+  id: serial("id").primaryKey(),
+  processId: integer("process_id").notNull().references(() => bpProcesses.id, { onDelete: "cascade" }),
+  blockId: varchar("block_id", { length: 100 }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  content: text("content").notNull(),
+  parentId: integer("parent_id").references(() => bpComments.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type BpComment = typeof bpComments.$inferSelect;
+export type InsertBpComment = typeof bpComments.$inferInsert;
+
+export const bpTemplates = pgTable("bp_templates", {
+  id: serial("id").primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  categoryId: integer("category_id").references(() => bpCategories.id, { onDelete: "set null" }),
+  content: text("content").notNull(),
+  authorId: integer("author_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  isPublic: boolean("is_public").default(false).notNull(),
+  usageCount: integer("usage_count").default(0).notNull(),
+  rating: numeric("rating", { precision: 3, scale: 2 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type BpTemplate = typeof bpTemplates.$inferSelect;
+export type InsertBpTemplate = typeof bpTemplates.$inferInsert;
+
+export const bpNotifications = pgTable("bp_notifications", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: varchar("type", { length: 50 }).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  content: text("content"),
+  relatedProcessId: integer("related_process_id").references(() => bpProcesses.id, { onDelete: "set null" }),
+  isRead: boolean("is_read").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type BpNotification = typeof bpNotifications.$inferSelect;
+export type InsertBpNotification = typeof bpNotifications.$inferInsert;
+
+export const bpUserSettings = pgTable("bp_user_settings", {
+  userId: integer("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  language: varchar("language", { length: 10 }).default("en").notNull(),
+  theme: bpThemeEnum("theme").default("auto").notNull(),
+  emailNotifications: boolean("email_notifications").default(true).notNull(),
+  pushNotifications: boolean("push_notifications").default(false).notNull(),
+  notificationFrequency: bpNotificationFrequencyEnum("notification_frequency")
+    .default("instant")
+    .notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type BpUserSettings = typeof bpUserSettings.$inferSelect;
+export type InsertBpUserSettings = typeof bpUserSettings.$inferInsert;
 

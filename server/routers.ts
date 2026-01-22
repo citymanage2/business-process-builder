@@ -51,6 +51,7 @@ import { transcribeAudio } from "./_core/voiceTranscription";
 import { storagePut } from "./storage";
 import { buildProcessPrompt, buildQuestionsPrompt, buildRecommendationsPrompt } from "./prompts";
 import { OPERATION_COSTS } from "@shared/costs";
+import { processBuilderRouter } from "./routers/processBuilder";
 
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -58,6 +59,7 @@ export const appRouter = router({
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
   }),
+  processBuilder: processBuilderRouter,
 
   companies: router({
     list: protectedProcedure.query(async ({ ctx }) => {

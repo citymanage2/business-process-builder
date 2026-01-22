@@ -1,4 +1,4 @@
-import { eq, like, and, or } from "drizzle-orm";
+import { and, desc, eq, isNull, like, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { 
@@ -12,7 +12,31 @@ import {
   InsertErrorLog, errorLogs,
   InsertSupportChat, supportChats,
   InsertSupportMessage, supportMessages,
-  InsertFaqArticle, faqArticles, FaqArticle
+  InsertFaqArticle, faqArticles, FaqArticle,
+  bpCategories,
+  bpComments,
+  bpNotifications,
+  bpProcessBlocks,
+  bpProcessCollaborators,
+  bpProcessConnections,
+  bpProcesses,
+  bpProcessTags,
+  bpProcessVersions,
+  bpTags,
+  bpTemplates,
+  bpUserSettings,
+  InsertBpCategory,
+  InsertBpComment,
+  InsertBpNotification,
+  InsertBpProcess,
+  InsertBpProcessBlock,
+  InsertBpProcessCollaborator,
+  InsertBpProcessConnection,
+  InsertBpProcessTag,
+  InsertBpProcessVersion,
+  InsertBpTag,
+  InsertBpTemplate,
+  InsertBpUserSettings,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -739,4 +763,389 @@ export async function updateUserPassword(userId: number, passwordHash: string): 
   if (!db) throw new Error("Database not available");
 
   await db.update(users).set({ passwordHash }).where(eq(users.id, userId));
+}
+
+// =====================
+// Business Process Builder (bp_) data access
+// =====================
+
+export async function createBpProcess(process: InsertBpProcess) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(bpProcesses).values(process).returning({ id: bpProcesses.id });
+  return result[0].id;
+}
+
+export async function listBpProcesses(filters: {
+  ownerId?: number;
+  visibility?: "private" | "public";
+  status?: "draft" | "published" | "archived";
+  categoryId?: number;
+  search?: string;
+  limit?: number;
+  offset?: number;
+}) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const conditions = [];
+  if (filters.ownerId) conditions.push(eq(bpProcesses.ownerId, filters.ownerId));
+  if (filters.visibility) conditions.push(eq(bpProcesses.visibility, filters.visibility));
+  if (filters.status) conditions.push(eq(bpProcesses.status, filters.status));
+  if (filters.categoryId) conditions.push(eq(bpProcesses.categoryId, filters.categoryId));
+  conditions.push(isNull(bpProcesses.deletedAt));
+  if (filters.search) {
+    const term = `%${filters.search}%`;
+    conditions.push(or(like(bpProcesses.title, term), like(bpProcesses.description, term)));
+  }
+
+  const query = db
+    .select()
+    .from(bpProcesses)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .orderBy(desc(bpProcesses.updatedAt))
+    .limit(filters.limit ?? 50)
+    .offset(filters.offset ?? 0);
+
+  return await query;
+}
+
+export async function getBpProcessById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(bpProcesses).where(eq(bpProcesses.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function updateBpProcess(id: number, data: Partial<InsertBpProcess>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(bpProcesses).set({ ...data, updatedAt: new Date() }).where(eq(bpProcesses.id, id));
+}
+
+export async function softDeleteBpProcess(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db
+    .update(bpProcesses)
+    .set({ deletedAt: new Date(), status: "archived", archivedAt: new Date() })
+    .where(eq(bpProcesses.id, id));
+}
+
+export async function restoreBpProcess(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(bpProcesses).set({ deletedAt: null, archivedAt: null, status: "draft" }).where(eq(bpProcesses.id, id));
+}
+
+export async function hardDeleteBpProcess(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(bpProcesses).where(eq(bpProcesses.id, id));
+}
+
+export async function incrementBpProcessViewCount(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db
+    .update(bpProcesses)
+    .set({ viewCount: sql`${bpProcesses.viewCount} + 1` })
+    .where(eq(bpProcesses.id, id));
+}
+
+export async function createBpProcessVersion(version: InsertBpProcessVersion) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(bpProcessVersions).values(version).returning({ id: bpProcessVersions.id });
+  return result[0].id;
+}
+
+export async function listBpProcessVersions(processId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return await db
+    .select()
+    .from(bpProcessVersions)
+    .where(eq(bpProcessVersions.processId, processId))
+    .orderBy(desc(bpProcessVersions.versionNumber));
+}
+
+export async function getBpProcessVersionById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(bpProcessVersions).where(eq(bpProcessVersions.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function listBpProcessBlocks(processId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(bpProcessBlocks).where(eq(bpProcessBlocks.processId, processId));
+}
+
+export async function createBpProcessBlock(block: InsertBpProcessBlock) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(bpProcessBlocks).values(block).returning({ id: bpProcessBlocks.id });
+  return result[0].id;
+}
+
+export async function updateBpProcessBlock(id: number, data: Partial<InsertBpProcessBlock>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(bpProcessBlocks).set({ ...data, updatedAt: new Date() }).where(eq(bpProcessBlocks.id, id));
+}
+
+export async function deleteBpProcessBlock(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(bpProcessBlocks).where(eq(bpProcessBlocks.id, id));
+}
+
+export async function replaceBpProcessBlocks(processId: number, blocks: InsertBpProcessBlock[]) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(bpProcessBlocks).where(eq(bpProcessBlocks.processId, processId));
+  if (blocks.length > 0) {
+    await db.insert(bpProcessBlocks).values(blocks);
+  }
+}
+
+export async function listBpProcessConnections(processId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(bpProcessConnections).where(eq(bpProcessConnections.processId, processId));
+}
+
+export async function createBpProcessConnection(connection: InsertBpProcessConnection) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db
+    .insert(bpProcessConnections)
+    .values(connection)
+    .returning({ id: bpProcessConnections.id });
+  return result[0].id;
+}
+
+export async function updateBpProcessConnection(id: number, data: Partial<InsertBpProcessConnection>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(bpProcessConnections).set(data).where(eq(bpProcessConnections.id, id));
+}
+
+export async function deleteBpProcessConnection(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(bpProcessConnections).where(eq(bpProcessConnections.id, id));
+}
+
+export async function replaceBpProcessConnections(
+  processId: number,
+  connections: InsertBpProcessConnection[],
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(bpProcessConnections).where(eq(bpProcessConnections.processId, processId));
+  if (connections.length > 0) {
+    await db.insert(bpProcessConnections).values(connections);
+  }
+}
+
+export async function listBpCategories() {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(bpCategories).orderBy(bpCategories.name);
+}
+
+export async function createBpCategory(category: InsertBpCategory) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(bpCategories).values(category).returning({ id: bpCategories.id });
+  return result[0].id;
+}
+
+export async function updateBpCategory(id: number, data: Partial<InsertBpCategory>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(bpCategories).set({ ...data, updatedAt: new Date() }).where(eq(bpCategories.id, id));
+}
+
+export async function deleteBpCategory(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(bpCategories).where(eq(bpCategories.id, id));
+}
+
+export async function listBpTags() {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(bpTags).orderBy(bpTags.name);
+}
+
+export async function searchBpTags(query: string) {
+  const db = await getDb();
+  if (!db) return [];
+  const term = `%${query}%`;
+  return await db.select().from(bpTags).where(like(bpTags.name, term)).orderBy(bpTags.name).limit(10);
+}
+
+export async function createBpTag(tag: InsertBpTag) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(bpTags).values(tag).returning({ id: bpTags.id });
+  return result[0].id;
+}
+
+export async function createBpProcessTag(processTag: InsertBpProcessTag) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(bpProcessTags).values(processTag);
+}
+
+export async function deleteBpProcessTag(processId: number, tagId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db
+    .delete(bpProcessTags)
+    .where(and(eq(bpProcessTags.processId, processId), eq(bpProcessTags.tagId, tagId)));
+}
+
+export async function listBpProcessCollaborators(processId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(bpProcessCollaborators).where(eq(bpProcessCollaborators.processId, processId));
+}
+
+export async function createBpProcessCollaborator(collaborator: InsertBpProcessCollaborator) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db
+    .insert(bpProcessCollaborators)
+    .values(collaborator)
+    .returning({ id: bpProcessCollaborators.id });
+  return result[0].id;
+}
+
+export async function updateBpProcessCollaborator(id: number, data: Partial<InsertBpProcessCollaborator>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(bpProcessCollaborators).set(data).where(eq(bpProcessCollaborators.id, id));
+}
+
+export async function deleteBpProcessCollaborator(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(bpProcessCollaborators).where(eq(bpProcessCollaborators.id, id));
+}
+
+export async function listBpComments(processId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(bpComments).where(eq(bpComments.processId, processId));
+}
+
+export async function createBpComment(comment: InsertBpComment) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(bpComments).values(comment).returning({ id: bpComments.id });
+  return result[0].id;
+}
+
+export async function updateBpComment(id: number, data: Partial<InsertBpComment>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(bpComments).set({ ...data, updatedAt: new Date() }).where(eq(bpComments.id, id));
+}
+
+export async function deleteBpComment(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(bpComments).where(eq(bpComments.id, id));
+}
+
+export async function listBpTemplates(filters: { isPublic?: boolean; categoryId?: number }) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [];
+  if (filters.isPublic !== undefined) conditions.push(eq(bpTemplates.isPublic, filters.isPublic));
+  if (filters.categoryId) conditions.push(eq(bpTemplates.categoryId, filters.categoryId));
+  return await db
+    .select()
+    .from(bpTemplates)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .orderBy(desc(bpTemplates.usageCount));
+}
+
+export async function getBpTemplateById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(bpTemplates).where(eq(bpTemplates.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function createBpTemplate(template: InsertBpTemplate) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(bpTemplates).values(template).returning({ id: bpTemplates.id });
+  return result[0].id;
+}
+
+export async function updateBpTemplate(id: number, data: Partial<InsertBpTemplate>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(bpTemplates).set({ ...data, updatedAt: new Date() }).where(eq(bpTemplates.id, id));
+}
+
+export async function listBpNotifications(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(bpNotifications).where(eq(bpNotifications.userId, userId));
+}
+
+export async function createBpNotification(notification: InsertBpNotification) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db
+    .insert(bpNotifications)
+    .values(notification)
+    .returning({ id: bpNotifications.id });
+  return result[0].id;
+}
+
+export async function markBpNotificationRead(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(bpNotifications).set({ isRead: true }).where(eq(bpNotifications.id, id));
+}
+
+export async function markAllBpNotificationsRead(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(bpNotifications).set({ isRead: true }).where(eq(bpNotifications.userId, userId));
+}
+
+export async function deleteBpNotification(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(bpNotifications).where(eq(bpNotifications.id, id));
+}
+
+export async function getBpUserSettings(userId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(bpUserSettings).where(eq(bpUserSettings.userId, userId)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function upsertBpUserSettings(userId: number, data: Partial<InsertBpUserSettings>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const existing = await getBpUserSettings(userId);
+  if (!existing) {
+    await db.insert(bpUserSettings).values({ userId, ...data });
+    return;
+  }
+
+  await db.update(bpUserSettings).set({ ...data, updatedAt: new Date() }).where(eq(bpUserSettings.userId, userId));
 }

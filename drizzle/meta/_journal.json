@@ -15,6 +15,13 @@
       "when": 1764943289136,
       "tag": "0001_easy_earthquake",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1769118033000,
+      "tag": "0002_process_builder",
+      "breakpoints": true
     }
   ]
 }
