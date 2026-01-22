@@ -28,7 +28,8 @@ export default function ProcessView() {
     onSuccess: () => {
       toast.success("Изменения сохранены");
       refetch();
-      setEditMode(false);
+      // Не выходим из режима редактирования при автосохранении
+      // setEditMode(false); - убрано, теперь выход только по кнопке
     },
     onError: (error) => {
       toast.error(`Ошибка сохранения: ${error.message}`);
