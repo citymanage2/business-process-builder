@@ -102,7 +102,11 @@ export default function ProcessDiagramEditable({ steps: initialSteps, roles, sta
   };
 
   const handleSave = () => {
-    onSave(steps);
+    // Используем функциональное обновление для получения актуального состояния
+    setSteps((currentSteps) => {
+      onSave(currentSteps);
+      return currentSteps;
+    });
     toast.success("Изменения сохранены");
   };
 
