@@ -21,6 +21,10 @@ import CompanyProcesses from "./pages/CompanyProcesses";
 import Admin from "./pages/Admin";
 import AdminSupport from "./pages/AdminSupport";
 import SupportChat from "./components/SupportChat";
+// Process Builder pages
+import BuilderDashboard from "./pages/BuilderDashboard";
+import BuilderEditor from "./pages/BuilderEditor";
+import BuilderView from "./pages/BuilderView";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -42,6 +46,10 @@ function Router() {
       <Route path="/company/:id/processes" component={CompanyProcesses} />
       <Route path="/admin" component={Admin} />
       <Route path="/admin/support" component={AdminSupport} />
+      {/* Process Builder routes */}
+      <Route path="/builder" component={BuilderDashboard} />
+      <Route path="/builder/edit/:id" component={BuilderEditor} />
+      <Route path="/builder/view/:id" component={BuilderView} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />

@@ -224,4 +224,163 @@ export const faqArticles = pgTable("faq_articles", {
 export type FaqArticle = typeof faqArticles.$inferSelect;
 export type InsertFaqArticle = typeof faqArticles.$inferInsert;
 
+// =============================================
+// Process Builder Tables
+// =============================================
+
+// Enums for Process Builder
+export const builderBlockTypeEnum = pgEnum("builder_block_type", [
+  "start", "end", "entry_point", "exit_point",
+  "task", "subprocess", "manual_action", "automated_action", "send_notification", "api_call",
+  "condition", "multiple_choice", "parallel_gateway", "exclusive_gateway",
+  "data_input", "data_output", "data_store", "document",
+  "timer_event", "signal_event", "error_event", "escalation_event",
+  "role", "department", "external_system"
+]);
+
+export const builderConnectionTypeEnum = pgEnum("builder_connection_type", [
+  "sequence_flow", "data_flow", "conditional_flow"
+]);
+
+export const builderProcessStatusEnum = pgEnum("builder_process_status", [
+  "draft", "published", "archived"
+]);
+
+export const builderVisibilityEnum = pgEnum("builder_visibility", [
+  "private", "public"
+]);
+
+export const builderAccessRoleEnum = pgEnum("builder_access_role", [
+  "owner", "editor", "viewer", "commenter"
+]);
+
+export const notificationTypeEnum = pgEnum("notification_type", [
+  "invite", "comment", "mention", "process_update", "deadline", "system"
+]);
+
+// Categories for organizing processes
+export const builderCategories = pgTable("builder_categories", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  color: varchar("color", { length: 7 }), // HEX color code
+  icon: varchar("icon", { length: 50 }), // Icon name from library
+  parentId: integer("parent_id"), // For hierarchical categories
+  userId: integer("user_id").references(() => users.id, { onDelete: "set null" }), // null for system categories
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type BuilderCategory = typeof builderCategories.$inferSelect;
+export type InsertBuilderCategory = typeof builderCategories.$inferInsert;
+
+// Main processes table
+export const builderProcesses = pgTable("builder_processes", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 500 }).notNull(),
+  description: text("description"),
+  ownerId: integer("owner_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  categoryId: integer("category_id").references(() => builderCategories.id, { onDelete: "set null" }),
+  status: builderProcessStatusEnum("status").default("draft").notNull(),
+  visibility: builderVisibilityEnum("visibility").default("private").notNull(),
+  tags: text("tags"), // JSON array of tags
+  thumbnail: text("thumbnail"), // Base64 or URL of process thumbnail
+  currentVersion: integer("current_version").default(1).notNull(),
+  viewCount: integer("view_count").default(0).notNull(),
+  // Canvas settings
+  canvasSettings: text("canvas_settings"), // JSON: zoom, pan position, grid settings
+  // Process data (blocks and connections stored as JSON for quick loading)
+  blocksData: text("blocks_data"), // JSON array of all blocks
+  connectionsData: text("connections_data"), // JSON array of all connections
+  // Metadata
+  deletedAt: timestamp("deleted_at"), // For soft delete
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type BuilderProcess = typeof builderProcesses.$inferSelect;
+export type InsertBuilderProcess = typeof builderProcesses.$inferInsert;
+
+// Version history for processes
+export const builderVersions = pgTable("builder_versions", {
+  id: serial("id").primaryKey(),
+  processId: integer("process_id").notNull().references(() => builderProcesses.id, { onDelete: "cascade" }),
+  versionNumber: integer("version_number").notNull(),
+  authorId: integer("author_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  comment: text("comment"), // Version comment
+  snapshot: text("snapshot").notNull(), // Full JSON snapshot of the process state
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type BuilderVersion = typeof builderVersions.$inferSelect;
+export type InsertBuilderVersion = typeof builderVersions.$inferInsert;
+
+// Collaborators for shared access
+export const builderCollaborators = pgTable("builder_collaborators", {
+  id: serial("id").primaryKey(),
+  processId: integer("process_id").notNull().references(() => builderProcesses.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  role: builderAccessRoleEnum("role").default("viewer").notNull(),
+  inviteToken: varchar("invite_token", { length: 255 }),
+  invitedAt: timestamp("invited_at").defaultNow().notNull(),
+  acceptedAt: timestamp("accepted_at"),
+});
+
+export type BuilderCollaborator = typeof builderCollaborators.$inferSelect;
+export type InsertBuilderCollaborator = typeof builderCollaborators.$inferInsert;
+
+// Comments on processes and blocks
+export const builderComments = pgTable("builder_comments", {
+  id: serial("id").primaryKey(),
+  processId: integer("process_id").notNull().references(() => builderProcesses.id, { onDelete: "cascade" }),
+  blockId: varchar("block_id", { length: 100 }), // If commenting on a specific block
+  parentId: integer("parent_id"), // For threaded comments
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  content: text("content").notNull(),
+  resolved: integer("resolved").default(0).notNull(), // 0 = unresolved, 1 = resolved
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type BuilderComment = typeof builderComments.$inferSelect;
+export type InsertBuilderComment = typeof builderComments.$inferInsert;
+
+// Templates for reusable processes
+export const builderTemplates = pgTable("builder_templates", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 500 }).notNull(),
+  description: text("description"),
+  categoryId: integer("category_id").references(() => builderCategories.id, { onDelete: "set null" }),
+  authorId: integer("author_id").references(() => users.id, { onDelete: "set null" }),
+  isSystem: integer("is_system").default(0).notNull(), // 1 = system template
+  isPublished: integer("is_published").default(0).notNull(), // 1 = publicly visible
+  thumbnail: text("thumbnail"),
+  processData: text("process_data").notNull(), // JSON snapshot of blocks and connections
+  tags: text("tags"),
+  usageCount: integer("usage_count").default(0).notNull(),
+  rating: integer("rating").default(0).notNull(), // Average rating * 10 for precision
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type BuilderTemplate = typeof builderTemplates.$inferSelect;
+export type InsertBuilderTemplate = typeof builderTemplates.$inferInsert;
+
+// Notifications for users
+export const builderNotifications = pgTable("builder_notifications", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: notificationTypeEnum("type").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  message: text("message"),
+  processId: integer("process_id").references(() => builderProcesses.id, { onDelete: "cascade" }),
+  commentId: integer("comment_id").references(() => builderComments.id, { onDelete: "cascade" }),
+  fromUserId: integer("from_user_id").references(() => users.id, { onDelete: "set null" }),
+  isRead: integer("is_read").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type BuilderNotification = typeof builderNotifications.$inferSelect;
+export type InsertBuilderNotification = typeof builderNotifications.$inferInsert;
+
 
