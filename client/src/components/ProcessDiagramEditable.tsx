@@ -91,7 +91,7 @@ export default function ProcessDiagramEditable({ steps: initialSteps, roles, sta
     
     const [newRoleId, newStageId] = parts;
 
-    // Обновляем шаг
+    // Обновляем шаг и сохраняем в БД
     setSteps((prevSteps) => {
       const updatedSteps = prevSteps.map((step) =>
         step.id === active.id
@@ -99,11 +99,13 @@ export default function ProcessDiagramEditable({ steps: initialSteps, roles, sta
           : step
       );
       console.log("Steps updated:", updatedSteps);
+      // Автоматически сохраняем изменения в БД
+      onSave(updatedSteps);
       return updatedSteps;
     });
 
     setActiveId(null);
-    toast.success("Элемент перемещен");
+    toast.success("Элемент перемещен и сохранен");
   };
 
   const handleSave = () => {
