@@ -277,6 +277,7 @@ export default function Processes() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+            </div>
           </div>
         </div>
       </header>

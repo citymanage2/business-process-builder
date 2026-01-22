@@ -77,11 +77,8 @@ const ProcessEdge = memo(
           style={{
             ...edgeStyle,
             ...(selected && { stroke: '#3b82f6', strokeWidth: 3 }),
+            transition: 'all 0.2s',
           }}
-          className={cn(
-            'transition-all duration-200',
-            connectionType === CONNECTION_TYPES.CONDITIONAL_FLOW && 'animate-dash'
-          )}
         />
         
         {/* Edge label */}

@@ -72,7 +72,7 @@ function ProcessCanvasInner({ onNodeClick, onPaneClick, language = 'ru' }: Proce
       if (!type) return;
       
       const blockDefJson = event.dataTransfer.getData('application/reactflow/blockDef');
-      let blockDef: BlockDefinition | null = null;
+      let blockDef: BlockDefinition | undefined = undefined;
       
       try {
         blockDef = blockDefJson ? JSON.parse(blockDefJson) : getBlockDefinition(type as any);
