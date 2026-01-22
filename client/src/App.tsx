@@ -21,6 +21,8 @@ import CompanyProcesses from "./pages/CompanyProcesses";
 import Admin from "./pages/Admin";
 import AdminSupport from "./pages/AdminSupport";
 import SupportChat from "./components/SupportChat";
+import ProcessBuilderList from "./pages/ProcessBuilderList";
+import ProcessBuilderEditor from "./pages/ProcessBuilderEditor";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -38,6 +40,9 @@ function Router() {
       <Route path="/form-interview/:id/:type" component={FormInterview} />
       <Route path="/process/generate/:companyId/:interviewId" component={ProcessGenerate} />
       <Route path="/process/:id" component={ProcessView} />
+      <Route path="/builder" component={ProcessBuilderList} />
+      <Route path="/builder/new" component={ProcessBuilderEditor} />
+      <Route path="/builder/:id" component={ProcessBuilderEditor} />
       <Route path="/profile" component={Profile} />
       <Route path="/company/:id/processes" component={CompanyProcesses} />
       <Route path="/admin" component={Admin} />
