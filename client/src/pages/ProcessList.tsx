@@ -161,10 +161,16 @@ export function ProcessListPage() {
             </p>
           </div>
           
-          <Button onClick={() => navigate('/builder/new')}>
-            <LucideIcons.Plus size={20} className="mr-2" />
-            Новый процесс
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => navigate('/templates')}>
+              <LucideIcons.Layout size={20} className="mr-2" />
+              Шаблоны
+            </Button>
+            <Button onClick={() => navigate('/builder/new')}>
+              <LucideIcons.Plus size={20} className="mr-2" />
+              Новый процесс
+            </Button>
+          </div>
         </div>
 
         {/* Stats */}
