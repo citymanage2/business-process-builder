@@ -1,6 +1,6 @@
 import { eq, like, and, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { Client } from "pg";
+import { Pool } from "pg";
 import { 
   InsertUser, users,
   InsertCompany, companies,
@@ -16,28 +16,63 @@ import {
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
-// Create database connection - creates new client each time to avoid connection issues
-export async function getDb() {
+// Global connection pool - reuses connections efficiently
+let pool: Pool | null = null;
+
+// Initialize connection pool (called once on server start)
+function initPool() {
   if (!process.env.DATABASE_URL) {
     console.warn("[Database] DATABASE_URL not set");
     return null;
   }
 
-  try {
-    console.log('[Database] Creating new client...');
-    const client = new Client({
-      connectionString: process.env.DATABASE_URL,
-      ssl: {
-        rejectUnauthorized: false
-      }
-    });
-    await client.connect();
-    console.log('[Database] Client connected successfully');
-    
-    return drizzle(client);
-  } catch (error) {
-    console.error("[Database] Failed to connect:", error);
+  if (pool) {
+    return pool;
+  }
+
+  console.log('[Database] Initializing connection pool...');
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+      rejectUnauthorized: false
+    },
+    max: 20, // Maximum number of clients in the pool
+    idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
+    connectionTimeoutMillis: 10000, // Return error after 10 seconds if unable to connect
+  });
+
+  pool.on('error', (err) => {
+    console.error('[Database] Unexpected pool error:', err);
+  });
+
+  console.log('[Database] Connection pool initialized');
+  return pool;
+}
+
+// Get database instance with connection pooling
+export async function getDb() {
+  const currentPool = initPool();
+  
+  if (!currentPool) {
+    console.warn("[Database] Pool not available");
     return null;
+  }
+
+  try {
+    return drizzle(currentPool);
+  } catch (error) {
+    console.error("[Database] Failed to get drizzle instance:", error);
+    return null;
+  }
+}
+
+// Graceful shutdown - close all connections
+export async function closePool() {
+  if (pool) {
+    console.log('[Database] Closing connection pool...');
+    await pool.end();
+    pool = null;
+    console.log('[Database] Connection pool closed');
   }
 }
 
