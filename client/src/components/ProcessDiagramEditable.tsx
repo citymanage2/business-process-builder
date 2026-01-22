@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -52,6 +52,11 @@ interface Props {
 export default function ProcessDiagramEditable({ steps: initialSteps, roles, stages, onSave }: Props) {
   const [steps, setSteps] = useState(initialSteps);
   const [activeId, setActiveId] = useState<string | null>(null);
+
+  // Синхронизируем локальное состояние с props при изменении initialSteps
+  useEffect(() => {
+    setSteps(initialSteps);
+  }, [initialSteps]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
