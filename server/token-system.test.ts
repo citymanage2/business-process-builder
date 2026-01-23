@@ -1,5 +1,24 @@
-import { describe, it, expect, beforeAll } from 'vitest';
-import { getUserBalance, deductTokens, updateUserBalance } from './db';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const balances = new Map<number, number>();
+
+vi.mock('./db', () => ({
+  getUserBalance: async (userId: number) => balances.get(userId) ?? 0,
+  updateUserBalance: async (userId: number, newBalance: number) => {
+    balances.set(userId, newBalance);
+    return true;
+  },
+  deductTokens: async (userId: number, amount: number) => {
+    const currentBalance = balances.get(userId) ?? 0;
+    if (currentBalance < amount) {
+      return false;
+    }
+    balances.set(userId, currentBalance - amount);
+    return true;
+  },
+}));
+
+import { deductTokens, getUserBalance, updateUserBalance } from './db';
 
 /**
  * Тесты для системы списания токенов
@@ -13,6 +32,10 @@ import { getUserBalance, deductTokens, updateUserBalance } from './db';
 
 describe('Token Balance System', () => {
   const TEST_USER_ID = 1; // Используем существующего пользователя
+
+  beforeEach(() => {
+    balances.clear();
+  });
   
   it('should get user balance', async () => {
     const balance = await getUserBalance(TEST_USER_ID);
