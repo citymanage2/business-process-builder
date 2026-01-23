@@ -1,5 +1,6 @@
 import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
+import { isFrontOnly } from "@/lib/frontOnly";
 import { useCallback, useEffect, useMemo } from "react";
 
 type UseAuthOptions = {
@@ -23,6 +24,12 @@ export function useAuth(options?: UseAuthOptions) {
   // ✅ УЛУЧШЕНО: Функция logout с правильной очисткой
   const logout = useCallback(async () => {
     try {
+      if (isFrontOnly) {
+        utils.auth.me.setData(undefined, null);
+        await utils.auth.me.invalidate();
+        localStorage.removeItem('manus-runtime-user-info');
+        return;
+      }
       await fetch('/api/auth/logout', { 
         method: 'POST',
         credentials: 'include' // ✅ ДОБАВЛЕНО: Отправка cookie
@@ -72,6 +79,7 @@ export function useAuth(options?: UseAuthOptions) {
 
   // ✅ Редирект на логин если не авторизован
   useEffect(() => {
+    if (isFrontOnly) return;
     if (!redirectOnUnauthenticated) return;
     if (meQuery.isLoading) return;
     if (state.user) return;

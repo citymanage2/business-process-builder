@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { isFrontOnly } from "@/lib/frontOnly";
 
 export function useSocket() {
   const { user } = useAuth();
@@ -8,7 +9,7 @@ export function useSocket() {
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || isFrontOnly) return;
 
     // Создаем Socket.IO соединение
     const socket = io({
