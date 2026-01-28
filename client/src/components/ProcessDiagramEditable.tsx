@@ -104,8 +104,9 @@ export default function ProcessDiagramEditable({ steps: initialSteps, roles, sta
       return;
     }
     
-    const newRoleId = roleMatch[1];
-    const newStageId = stageMatch[1];
+    // Приводим к строковому типу (совместимо с нормализацией в ProcessView)
+    const newRoleId = String(roleMatch[1]);
+    const newStageId = String(stageMatch[1]);
     
     // Логирование для диагностики
     const draggedStep = steps.find(s => s.id === active.id);

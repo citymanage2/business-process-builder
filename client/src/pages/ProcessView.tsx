@@ -74,6 +74,16 @@ export default function ProcessView() {
     );
   }
 
+  // Нормализуем id в строковый формат для согласованности между drop-id и полями шагов
+  const normalizedRoles = (process.roles || []).map((r: any) => ({ ...r, id: String(r.id) }));
+  const normalizedStages = (process.stages || []).map((s: any) => ({ ...s, id: String(s.id) }));
+  const normalizedSteps = (process.steps || []).map((st: any) => ({
+    ...st,
+    id: String(st.id),
+    roleId: st.roleId !== undefined && st.roleId !== null ? String(st.roleId) : st.roleId,
+    stageId: st.stageId !== undefined && st.stageId !== null ? String(st.stageId) : st.stageId,
+  }));
+
   const categoryIcons: Record<string, any> = {
     optimization: TrendingUp,
     automation: Sparkles,
@@ -197,9 +207,9 @@ export default function ProcessView() {
               <CardContent>
                 {editMode ? (
                   <ProcessDiagramEditable
-                    steps={process.steps || []}
-                    roles={process.roles || []}
-                    stages={process.stages || []}
+                    steps={normalizedSteps}
+                    roles={normalizedRoles}
+                    stages={normalizedStages}
                     onSave={(updatedSteps) => {
                       updateProcessMutation.mutate({
                         id: processId,
@@ -209,9 +219,9 @@ export default function ProcessView() {
                   />
                 ) : (
                   <ProcessDiagramSwimlane
-                    steps={process.steps || []}
-                    roles={process.roles || []}
-                    stages={process.stages || []}
+                    steps={normalizedSteps}
+                    roles={normalizedRoles}
+                    stages={normalizedStages}
                     title="Кросс-функциональная схема (Swimlane)"
                   />
                 )}
