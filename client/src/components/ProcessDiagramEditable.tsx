@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -52,12 +52,25 @@ interface Props {
 export default function ProcessDiagramEditable({ steps: initialSteps, roles, stages, onSave }: Props) {
   const [steps, setSteps] = useState(initialSteps);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const previousInitialStepsRef = useRef(initialSteps);
 
-  // УБРАН useEffect который перезаписывал локальное состояние после drag and drop
-  // useEffect(() => {
-  //   setSteps(initialSteps);
-  // }, [initialSteps]);
-  // Проблема: при перерисовке родителя initialSteps менялся и перезаписывал локальные изменения
+  // Синхронизируем steps с initialSteps только если последний действительно изменился
+  useEffect(() => {
+    // Сравниваем длину и IDs для определения реального изменения
+    const hasRealChange = 
+      initialSteps.length !== previousInitialStepsRef.current.length ||
+      initialSteps.some((step, idx) => 
+        step.id !== previousInitialStepsRef.current[idx]?.id ||
+        step.roleId !== previousInitialStepsRef.current[idx]?.roleId ||
+        step.stageId !== previousInitialStepsRef.current[idx]?.stageId
+      );
+
+    if (hasRealChange) {
+      console.log("[ProcessDiagramEditable] Detected real change in initialSteps, syncing local state");
+      setSteps(initialSteps);
+      previousInitialStepsRef.current = initialSteps;
+    }
+  }, [initialSteps]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -82,8 +95,8 @@ export default function ProcessDiagramEditable({ steps: initialSteps, roles, sta
     // Парсим ID для определения новой позиции
     const overId = over.id as string;
     // Парсим ID цели (формат: "role_X_stage_Y")
-    const roleMatch = overId.match(/role_(\d+)/);
-    const stageMatch = overId.match(/stage_(\d+)/);
+    const roleMatch = overId.match(/role_([^_]+)/);
+    const stageMatch = overId.match(/stage_([^_]+)/);
     
     if (!roleMatch || !stageMatch) {
       console.error("Invalid drop target ID:", overId);
@@ -96,36 +109,44 @@ export default function ProcessDiagramEditable({ steps: initialSteps, roles, sta
     
     // Логирование для диагностики
     const draggedStep = steps.find(s => s.id === active.id);
-    console.log("[DRAG] Dragged step:", draggedStep);
-    console.log("[DRAG] Old roleId/stageId:", draggedStep?.roleId, draggedStep?.stageId, "types:", typeof draggedStep?.roleId, typeof draggedStep?.stageId);
-    console.log("[DRAG] New roleId/stageId:", newRoleId, newStageId, "types:", typeof newRoleId, typeof newStageId);
-    console.log("[DRAG] All steps before update:", steps.length);
-    console.log("[DRAG] Available roles:", roles.map(r => ({ id: r.id, type: typeof r.id })));
-    console.log("[DRAG] Available stages:", stages.map(s => ({ id: s.id, type: typeof s.id })));
+    
+    if (!draggedStep) {
+      console.error("Step not found:", active.id);
+      setActiveId(null);
+      return;
+    }
 
-    // Обновляем шаг и сохраняем в БД
-    setSteps((prevSteps) => {
-      const updatedSteps = prevSteps.map((step) =>
-        step.id === active.id
-          ? { ...step, roleId: newRoleId, stageId: newStageId }
-          : step
-      );
-      console.log("Steps updated:", updatedSteps);
-      // Автоматически сохраняем изменения в БД
-      onSave(updatedSteps);
-      return updatedSteps;
-    });
+    console.log("[DRAG] Dragged step:", draggedStep);
+    console.log("[DRAG] Old roleId/stageId:", draggedStep.roleId, draggedStep.stageId);
+    console.log("[DRAG] New roleId/stageId:", newRoleId, newStageId);
+    console.log("[DRAG] All steps before update:", steps.length);
+
+    // Если шаг уже находится в нужной ячейке, не обновляем
+    if (draggedStep.roleId === newRoleId && draggedStep.stageId === newStageId) {
+      console.log("[DRAG] Step is already in target cell, no update needed");
+      setActiveId(null);
+      return;
+    }
+
+    // Обновляем шаг локально (без сохранения в БД)
+    const updatedSteps = steps.map((step) =>
+      step.id === active.id
+        ? { ...step, roleId: newRoleId, stageId: newStageId }
+        : step
+    );
+    console.log("Steps updated:", updatedSteps);
+    console.log("Steps length after update:", updatedSteps.length);
+    
+    // Обновляем локальное состояние, но не сохраняем в БД автоматически
+    setSteps(updatedSteps);
 
     setActiveId(null);
-    toast.success("Элемент перемещен и сохранен");
+    toast.info("Элемент перемещен. Нажмите 'Сохранить изменения' для сохранения");
   };
 
   const handleSave = () => {
-    // Используем функциональное обновление для получения актуального состояния
-    setSteps((currentSteps) => {
-      onSave(currentSteps);
-      return currentSteps;
-    });
+    // Сохраняем текущее состояние в БД
+    onSave(steps);
     toast.success("Изменения сохранены");
   };
 
