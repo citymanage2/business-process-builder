@@ -162,7 +162,14 @@ function convertToClaudeMessages(messages: Message[]): { system?: string; messag
 }
 
 /**
- * Main LLM invocation function using Claude API
+ * Sleep utility for retry delays
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Main LLM invocation function using Claude API with retry logic
  */
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   const {
@@ -184,64 +191,85 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   // Check if JSON output is requested
   const jsonFormat = responseFormat || response_format || outputSchema || output_schema;
 
-  try {
-    let content: string;
+  // Retry configuration
+  const maxRetries = 3;
+  const baseDelay = 1000; // 1 second
 
-    if (jsonFormat) {
-      // Extract JSON schema if provided
-      let jsonSchema: any = undefined;
-      const format = responseFormat || response_format || outputSchema || output_schema;
-      
-      if (format && typeof format === 'object') {
-        if ('json_schema' in format && format.json_schema) {
-          jsonSchema = format.json_schema.schema || format.json_schema;
-        } else if ('schema' in format) {
-          jsonSchema = format.schema;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`[LLM] Attempt ${attempt}/${maxRetries}`);
+      let content: string;
+
+      if (jsonFormat) {
+        // Extract JSON schema if provided
+        let jsonSchema: any = undefined;
+        const format = responseFormat || response_format || outputSchema || output_schema;
+        
+        if (format && typeof format === 'object') {
+          if ('json_schema' in format && format.json_schema) {
+            jsonSchema = format.json_schema.schema || format.json_schema;
+          } else if ('schema' in format) {
+            jsonSchema = format.schema;
+          }
         }
+        
+        // Use JSON mode with optional schema
+        const jsonResult = await invokeClaudeJSON({
+          messages: claudeMessages,
+          systemPrompt: system,
+          maxTokens: maxTokensValue,
+          jsonSchema,
+        });
+        content = JSON.stringify(jsonResult);
+      } else {
+        // Regular text completion
+        content = await invokeClaude({
+          messages: claudeMessages,
+          systemPrompt: system,
+          maxTokens: maxTokensValue,
+        });
+      }
+
+      console.log(`[LLM] Success on attempt ${attempt}`);
+      
+      // Return in OpenAI-compatible format
+      return {
+        id: `claude-${Date.now()}`,
+        created: Math.floor(Date.now() / 1000),
+        model: 'claude-sonnet-4-5',
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content,
+            },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {
+          prompt_tokens: estimateTokens(claudeMessages.map(m => m.content).join(' ')),
+          completion_tokens: estimateTokens(content),
+          total_tokens: estimateTokens(claudeMessages.map(m => m.content).join(' ') + content),
+        },
+      };
+    } catch (error) {
+      console.error(`[LLM] Error on attempt ${attempt}:`, error);
+      
+      if (attempt === maxRetries) {
+        console.error('[LLM] All retry attempts failed');
+        throw error;
       }
       
-      // Use JSON mode with optional schema
-      const jsonResult = await invokeClaudeJSON({
-        messages: claudeMessages,
-        systemPrompt: system,
-        maxTokens: maxTokensValue,
-        jsonSchema,
-      });
-      content = JSON.stringify(jsonResult);
-    } else {
-      // Regular text completion
-      content = await invokeClaude({
-        messages: claudeMessages,
-        systemPrompt: system,
-        maxTokens: maxTokensValue,
-      });
+      // Exponential backoff
+      const delay = baseDelay * Math.pow(2, attempt - 1);
+      console.log(`[LLM] Retrying in ${delay}ms...`);
+      await sleep(delay);
     }
-
-    // Return in OpenAI-compatible format
-    return {
-      id: `claude-${Date.now()}`,
-      created: Math.floor(Date.now() / 1000),
-      model: 'claude-sonnet-4-5',
-      choices: [
-        {
-          index: 0,
-          message: {
-            role: 'assistant',
-            content,
-          },
-          finish_reason: 'stop',
-        },
-      ],
-      usage: {
-        prompt_tokens: estimateTokens(claudeMessages.map(m => m.content).join(' ')),
-        completion_tokens: estimateTokens(content),
-        total_tokens: estimateTokens(claudeMessages.map(m => m.content).join(' ') + content),
-      },
-    };
-  } catch (error) {
-    console.error('[LLM] Error:', error);
-    throw error;
   }
+
+  // This should never be reached, but TypeScript needs it
+  throw new Error('LLM invocation failed after all retries');
 }
 
 /**

@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Sparkles, ArrowLeft, Check, X } from "lucide-react";
+import { toast } from "sonner";
 import ProcessDiffViewer from "./ProcessDiffViewer";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import ProgressIndicator from "./ProgressIndicator";
@@ -45,8 +46,9 @@ export default function ProcessEditDialog({
     try {
       const preview = await onPreview(description);
       setPreviewData(preview);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Preview error:", error);
+      toast.error(error?.message || "Ошибка генерации предпросмотра");
     } finally {
       setIsLoadingPreview(false);
     }
@@ -58,9 +60,11 @@ export default function ProcessEditDialog({
     setIsConfirming(true);
     try {
       await onConfirm(previewData.updatedData, previewData.cost);
+      toast.success("Изменения успешно применены");
       handleClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Confirm error:", error);
+      toast.error(error?.message || "Ошибка применения изменений");
     } finally {
       setIsConfirming(false);
     }

@@ -431,7 +431,12 @@ export default function ProcessView() {
             id: processId,
             changeDescription: description,
           });
-          return result;
+          // Сервер возвращает { success, currentData, updatedData, cost }
+          return {
+            currentData: result.currentData,
+            updatedData: result.updatedData,
+            cost: result.cost,
+          };
         }}
         onConfirm={async (updatedData: any, cost: number) => {
           await confirmChangesMutation.mutateAsync({
