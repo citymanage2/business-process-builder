@@ -348,4 +348,162 @@ ${JSON.stringify(currentData, null, 2)}
         success: true,
       };
     }),
+
+  // Регенерация процесса на основе исходной анкеты
+  regenerate: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      // Получаем текущий процесс
+      const process = await getProcessById(input.id);
+      if (!process) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Процесс не найден',
+        });
+      }
+
+      // Проверяем наличие interviewId
+      if (!process.interviewId) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'Невозможно регенерировать: отсутствует связанная анкета',
+        });
+      }
+
+      // Проверяем баланс пользователя
+      const currentBalance = await getUserBalance(ctx.user.id);
+      const cost = OPERATION_COSTS.GENERATE_PROCESS;
+
+      if (currentBalance < cost) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: `Недостаточно токенов для регенерации. Требуется: ${cost}, доступно: ${currentBalance}`,
+        });
+      }
+
+      // Получаем данные компании и анкеты
+      const company = await getCompanyById(process.companyId);
+      const interview = await getInterviewById(process.interviewId);
+
+      if (!company || !interview) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Компания или анкета не найдены',
+        });
+      }
+
+      // Формируем контекст компании
+      const context = `
+Компания: ${company.name}
+Отрасль: ${company.industry || "Не указано"}
+Регион: ${company.region || "Не указано"}
+Формат: ${company.format || "Не указано"}
+Средний чек: ${company.averageCheck || "Не указано"}
+Продукты/услуги: ${company.productsServices || "Не указано"}
+ИТ-системы: ${company.itSystems || "Не указано"}
+      `;
+
+      // Обрабатываем данные анкеты
+      let interviewData = "";
+      
+      if (interview.answers) {
+        try {
+          const answers = JSON.parse(interview.answers);
+          interviewData = "Ответы на вопросы анкеты:\n";
+          for (const [questionId, answer] of Object.entries(answers)) {
+            interviewData += `${questionId}: ${answer}\n`;
+          }
+        } catch (e) {
+          console.error("Failed to parse interview answers", e);
+          interviewData = interview.structuredData || interview.transcript || "Нет данных";
+        }
+      } else {
+        interviewData = interview.structuredData || interview.transcript || "Нет данных";
+      }
+
+      const prompt = buildProcessPrompt(context, interviewData);
+
+      console.log(`[Process Regenerate] Starting regeneration for process ${input.id}`);
+
+      let response;
+      try {
+        response = await invokeLLM({
+          messages: [
+            { role: "system", content: "Ты эксперт по бизнес-процессам. Создавай детальные структурированные процессы в формате JSON." },
+            { role: "user", content: prompt },
+          ],
+          response_format: { type: "json_object" },
+          maxTokens: 32768,
+        });
+      } catch (error) {
+        console.error("[Process Regenerate] LLM invocation error:", error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Ошибка при обращении к AI-ассистенту. Попробуйте еще раз.',
+        });
+      }
+
+      const content = typeof response.choices[0].message.content === 'string' 
+        ? response.choices[0].message.content 
+        : JSON.stringify(response.choices[0].message.content);
+      
+      let processData;
+      try {
+        processData = JSON.parse(content);
+      } catch (error) {
+        console.error("[Process Regenerate] JSON parse error:", error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Не удалось обработать ответ AI. Попробуйте еще раз.',
+        });
+      }
+
+      // Проверяем обязательные поля
+      if (!processData.title || !processData.stages || !processData.roles || !processData.steps) {
+        console.error("[Process Regenerate] Missing required fields:", Object.keys(processData));
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Некорректная структура процесса. Попробуйте еще раз.',
+        });
+      }
+
+      // Обновляем процесс в БД
+      await updateBusinessProcess(input.id, {
+        title: processData.title,
+        description: processData.description,
+        startEvent: processData.startEvent,
+        endEvent: processData.endEvent,
+        stages: JSON.stringify(processData.stages),
+        roles: JSON.stringify(processData.roles),
+        steps: JSON.stringify(processData.steps),
+        branches: JSON.stringify(processData.branches),
+        documents: JSON.stringify(processData.documents),
+        itIntegration: JSON.stringify(processData.itIntegration),
+        diagramData: JSON.stringify(processData),
+        stageDetails: processData.stageDetails ? JSON.stringify(processData.stageDetails) : null,
+        totalTime: processData.metrics?.totalTimeMinutes || null,
+        totalCost: processData.metrics?.totalCostRub || null,
+        crmFunnels: processData.crmFunnels ? JSON.stringify(processData.crmFunnels) : null,
+        requiredDocuments: processData.missingDocuments ? JSON.stringify(processData.missingDocuments) : null,
+        salaryData: processData.metrics?.roleWorkload ? JSON.stringify(processData.metrics.roleWorkload) : null,
+      });
+
+      // Списываем токены
+      const deducted = await deductTokens(ctx.user.id, cost);
+      if (!deducted) {
+        console.error(`[Process Regenerate] Failed to deduct tokens for user ${ctx.user.id}`);
+      }
+
+      const newBalance = await getUserBalance(ctx.user.id);
+      console.log(`[Process Regenerate] Process regenerated successfully. User ${ctx.user.id} new balance: ${newBalance}`);
+
+      return {
+        success: true,
+        process: processData,
+        tokensDeducted: cost,
+        newBalance,
+      };
+    }),
 });

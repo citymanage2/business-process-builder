@@ -4,40 +4,47 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import ProcessDiagramSwimlane from "@/components/ProcessDiagramSwimlane";
-
-import ProcessEditDialog from "@/components/ProcessEditDialog";
 import ProcessModificationDialog from "@/components/ProcessModificationDialog";
 import ProcessMetrics from "@/components/ProcessMetrics";
 import CRMFunnels from "@/components/CRMFunnels";
 import RequiredDocuments from "@/components/RequiredDocuments";
 import StageDetails from "@/components/StageDetails";
+import ProgressIndicator from "@/components/ProgressIndicator";
 import { trpc } from "@/lib/trpc";
-import { Loader2, Sparkles, TrendingUp, AlertTriangle, Target, Download } from "lucide-react";
+import { Loader2, Sparkles, TrendingUp, AlertTriangle, Target, Download, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { exportProcessToPDF } from "@/lib/pdfExport";
+import { OPERATION_COSTS } from "@shared/costs";
 
 export default function ProcessView() {
   const [, params] = useRoute("/process/:id");
   const processId = params?.id ? parseInt(params.id) : 0;
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [regenerateDialogOpen, setRegenerateDialogOpen] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
 
   const { data: process, isLoading, refetch } = trpc.processes.get.useQuery({ id: processId });
-  
-  const previewChangesMutation = trpc.processes.previewChanges.useMutation({
-    onError: (error: any) => {
-      toast.error(`Ошибка генерации предпросмотра: ${error.message}`);
-    },
-  });
 
-  const confirmChangesMutation = trpc.processes.confirmChanges.useMutation({
+  const regenerateMutation = trpc.processes.regenerate.useMutation({
     onSuccess: () => {
-      toast.success("Изменения успешно применены");
+      toast.success("Процесс успешно перегенерирован");
       refetch();
-      setEditDialogOpen(false);
+      setRegenerateDialogOpen(false);
+      setIsRegenerating(false);
     },
     onError: (error: any) => {
-      toast.error(`Ошибка применения изменений: ${error.message}`);
+      toast.error(`Ошибка регенерации: ${error.message}`);
+      setIsRegenerating(false);
     },
   });
 
@@ -55,6 +62,11 @@ export default function ProcessView() {
 
   const handleGenerateRecommendations = () => {
     generateRecommendationsMutation.mutate({ processId });
+  };
+
+  const handleRegenerate = () => {
+    setIsRegenerating(true);
+    regenerateMutation.mutate({ id: processId });
   };
 
   if (isLoading) {
@@ -161,16 +173,15 @@ export default function ProcessView() {
                       onSubmit={(request) => {
                         console.log("Запрос на изменение:", request);
                         toast.info("Функция в разработке");
-                        // TODO: Добавить mutation для обработки запроса
                       }}
                     />
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setEditDialogOpen(true)}
+                      onClick={() => setRegenerateDialogOpen(true)}
                     >
-                      <Sparkles className="w-4 h-4 mr-2" />
-                      Предложить изменения
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Сгенерировать заново
                     </Button>
                     <Button
                       variant="outline"
@@ -423,29 +434,65 @@ export default function ProcessView() {
         </Tabs>
       </main>
 
-      <ProcessEditDialog
-        open={editDialogOpen}
-        onOpenChange={setEditDialogOpen}
-        onPreview={async (description: string) => {
-          const result = await previewChangesMutation.mutateAsync({
-            id: processId,
-            changeDescription: description,
-          });
-          // Сервер возвращает { success, currentData, updatedData, cost }
-          return {
-            currentData: result.currentData,
-            updatedData: result.updatedData,
-            cost: result.cost,
-          };
-        }}
-        onConfirm={async (updatedData: any, cost: number) => {
-          await confirmChangesMutation.mutateAsync({
-            id: processId,
-            updatedData,
-            cost,
-          });
-        }}
-      />
+      {/* Диалог подтверждения регенерации */}
+      <AlertDialog open={regenerateDialogOpen} onOpenChange={setRegenerateDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Сгенерировать процесс заново?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>
+                AI-ассистент создаст новую версию бизнес-процесса на основе исходной анкеты.
+                Текущая версия процесса будет заменена.
+              </p>
+              <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+                <Sparkles className="w-5 h-5 text-primary flex-shrink-0" />
+                <span className="text-sm">
+                  Стоимость операции: <strong>{OPERATION_COSTS.GENERATE_PROCESS} токенов</strong>
+                </span>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          {isRegenerating && (
+            <div className="py-4">
+              <ProgressIndicator
+                stages={[
+                  { label: "Загрузка данных анкеты", duration: 2000 },
+                  { label: "Анализ требований", duration: 3000 },
+                  { label: "Генерация структуры процесса", duration: 8000 },
+                  { label: "Создание этапов и ролей", duration: 6000 },
+                  { label: "Формирование диаграммы", duration: 4000 },
+                  { label: "Завершение", duration: 2000 },
+                ]}
+              />
+            </div>
+          )}
+          
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isRegenerating}>Отмена</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleRegenerate();
+              }}
+              disabled={isRegenerating}
+              className="gap-2"
+            >
+              {isRegenerating ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Генерация...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-4 h-4" />
+                  Сгенерировать
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
