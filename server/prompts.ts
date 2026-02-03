@@ -53,7 +53,7 @@ export const PROCESS_GENERATION_PROMPT = `
 2. **Этап уровня 0** — к какому крупному этапу относится шаг.
 3. **Название шага** — кратко, как подпись на блоке.
 4. **Роль** — кто отвечает за шаг.
-5. **Тип узла** — Start, Action, Decision, Split, Merge, Event, End
+6. **Тип узла** — Start (запуск), Action (действие), Product (продукт/результат), Decision (условие/ИЛИ), Split (разделение), End (завершение)
 6. **Вход** — что уже должно быть к началу шага.
 7. **Действия** — 3–5 пунктов списком что делает роль.
 8. **Выход** — конкретный результат шага.
@@ -123,17 +123,27 @@ export const PROCESS_GENERATION_PROMPT = `
       "id": "S1",
       "stageId": "stage_1",
       "roleId": "role_1",
-      "type": "Start|Action|Decision|Split|Merge|Event|End",
+      "type": "Start|Action|Product|Decision|Split|End",
       "name": "Название шага",
       "description": "Подробное описание",
       "order": 1,
       "input": "Что нужно на входе",
       "output": "Что получается на выходе",
-      "actions": ["Действие 1", "Действие 2", "Действие 3"],
-      "systems": ["Название системы 1", "Название системы 2"],
-      "duration": "Срок выполнения",
+      "checklist": ["Пункт чек-листа 1", "Пункт 2"],
+      "parameters": [
+        {
+          "type": "time|document|database|stage",
+          "value": "Значение параметра"
+        }
+      ],
       "previousSteps": ["S0"],
-      "nextSteps": ["S2"]
+      "nextSteps": ["S2"],
+      "branches": [
+        {
+          "condition": "Да/Нет или условие",
+          "targetStepId": "S3"
+        }
+      ]
     }
   ],
   "branches": [
