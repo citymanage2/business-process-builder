@@ -367,6 +367,111 @@ export const appRouter = router({
         await deleteBusinessProcess(input.id);
         return { success: true };
       }),
+    applyChanges: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        changeDescription: z.string(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        // Получаем текущий процесс
+        const process = await getProcessById(input.id);
+        if (!process) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Процесс не найден',
+          });
+        }
+
+        // Проверяем баланс пользователя
+        const currentBalance = await getUserBalance(ctx.user.id);
+        const cost = OPERATION_COSTS.GENERATE_PROCESS; // Используем ту же стоимость
+
+        if (currentBalance < cost) {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: `Недостаточно токенов для применения изменений. Требуется: ${cost}, доступно: ${currentBalance}`,
+          });
+        }
+
+        // Формируем промпт для LLM
+        const currentData = {
+          title: process.title,
+          description: process.description,
+          startEvent: process.startEvent,
+          endEvent: process.endEvent,
+          stages: process.stages ? JSON.parse(process.stages) : [],
+          roles: process.roles ? JSON.parse(process.roles) : [],
+          steps: process.steps ? JSON.parse(process.steps) : [],
+          branches: process.branches ? JSON.parse(process.branches) : [],
+          documents: process.documents ? JSON.parse(process.documents) : [],
+          itIntegration: process.itIntegration ? JSON.parse(process.itIntegration) : {},
+        };
+
+        const prompt = `Ты эксперт по бизнес-процессам. У тебя есть текущая структура процесса в JSON формате.
+
+Текущая структура процесса:
+${JSON.stringify(currentData, null, 2)}
+
+Пользователь хочет внести следующие изменения:
+"${input.changeDescription}"
+
+Примени эти изменения к структуре процесса и верни ПОЛНУЮ обновленную структуру в JSON формате.
+Сохрани все существующие поля и добавь/измени/удали только то, что указано в описании изменений.
+Ответ должен содержать ВСЕ поля: title, description, startEvent, endEvent, stages, roles, steps, branches, documents, itIntegration.
+
+Важно:
+- Сохраняй существующие ID для ролей, этапов и шагов
+- Если добавляешь новые элементы, генерируй для них уникальные ID (строки)
+- Все ID должны быть строками
+- Сохраняй порядок (order) элементов
+- Если перемещаешь блок, измени его roleId и stageId на соответствующие ID из структуры`;
+
+        const response = await invokeLLM({
+          messages: [
+            { role: "system", content: "Ты эксперт по бизнес-процессам. Применяешь изменения к структуре процессов в формате JSON." },
+            { role: "user", content: prompt },
+          ],
+          response_format: { type: "json_object" },
+          maxTokens: 32768,
+        });
+
+        const content = typeof response.choices[0].message.content === 'string' 
+          ? response.choices[0].message.content 
+          : JSON.stringify(response.choices[0].message.content);
+        
+        let updatedData;
+        try {
+          updatedData = JSON.parse(content);
+        } catch (error) {
+          console.error("[Apply Changes] JSON parse error:", error);
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Не удалось обработать изменения. Попробуйте еще раз.',
+          });
+        }
+
+        // Обновляем процесс в БД
+        await updateBusinessProcess(input.id, {
+          title: updatedData.title,
+          description: updatedData.description,
+          startEvent: updatedData.startEvent,
+          endEvent: updatedData.endEvent,
+          stages: JSON.stringify(updatedData.stages),
+          roles: JSON.stringify(updatedData.roles),
+          steps: JSON.stringify(updatedData.steps),
+          branches: JSON.stringify(updatedData.branches),
+          documents: JSON.stringify(updatedData.documents),
+          itIntegration: JSON.stringify(updatedData.itIntegration),
+        });
+
+        // Списываем токены
+        await deductTokens(ctx.user.id, cost);
+
+        return {
+          success: true,
+          updatedProcess: updatedData,
+        };
+      }),
   }),
 
   recommendations: router({

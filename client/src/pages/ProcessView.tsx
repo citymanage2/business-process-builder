@@ -6,34 +6,33 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import ProcessDiagram from "@/components/ProcessDiagram";
 import ProcessDiagramSwimlane from "@/components/ProcessDiagramSwimlane";
-import ProcessDiagramEditable from "@/components/ProcessDiagramEditable";
+
+import ProcessEditDialog from "@/components/ProcessEditDialog";
 import ProcessModificationDialog from "@/components/ProcessModificationDialog";
 import ProcessMetrics from "@/components/ProcessMetrics";
 import CRMFunnels from "@/components/CRMFunnels";
 import RequiredDocuments from "@/components/RequiredDocuments";
 import StageDetails from "@/components/StageDetails";
 import { trpc } from "@/lib/trpc";
-import { Loader2, Sparkles, TrendingUp, AlertTriangle, Target, Edit, Eye, Download } from "lucide-react";
+import { Loader2, Sparkles, TrendingUp, AlertTriangle, Target, Download } from "lucide-react";
 import { toast } from "sonner";
 import { exportProcessToPDF } from "@/lib/pdfExport";
 
 export default function ProcessView() {
   const [, params] = useRoute("/process/:id");
   const processId = params?.id ? parseInt(params.id) : 0;
-  const [editMode, setEditMode] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   const { data: process, isLoading, refetch } = trpc.processes.get.useQuery({ id: processId });
   
-  const updateProcessMutation = trpc.processes.update.useMutation({
+  const applyChangesMutation = trpc.processes.applyChanges.useMutation({
     onSuccess: () => {
-      toast.success("Изменения сохранены");
-      // Убран refetch() чтобы избежать перезаписи локального состояния при drag and drop
-      // refetch(); - приводило к удалению блоков
-      // Не выходим из режима редактирования при автосохранении
-      // setEditMode(false); - убрано, теперь выход только по кнопке
+      toast.success("Изменения успешно применены");
+      refetch();
+      setEditDialogOpen(false);
     },
     onError: (error) => {
-      toast.error(`Ошибка сохранения: ${error.message}`);
+      toast.error(`Ошибка применения изменений: ${error.message}`);
     },
   });
 
@@ -161,21 +160,12 @@ export default function ProcessView() {
                       }}
                     />
                     <Button
-                      variant={editMode ? "default" : "outline"}
+                      variant="outline"
                       size="sm"
-                      onClick={() => setEditMode(!editMode)}
+                      onClick={() => setEditDialogOpen(true)}
                     >
-                      {editMode ? (
-                        <>
-                          <Eye className="w-4 h-4 mr-2" />
-                          Просмотр
-                        </>
-                      ) : (
-                        <>
-                          <Edit className="w-4 h-4 mr-2" />
-                          Редактировать
-                        </>
-                      )}
+                      <Sparkles className="w-4 h-4 mr-2" />
+                      Предложить изменения
                     </Button>
                     <Button
                       variant="outline"
@@ -195,26 +185,12 @@ export default function ProcessView() {
                 </div>
               </CardHeader>
               <CardContent>
-                {editMode ? (
-                  <ProcessDiagramEditable
-                    steps={process.steps || []}
-                    roles={process.roles || []}
-                    stages={process.stages || []}
-                    onSave={(updatedSteps) => {
-                      updateProcessMutation.mutate({
-                        id: processId,
-                        steps: updatedSteps,
-                      });
-                    }}
-                  />
-                ) : (
-                  <ProcessDiagramSwimlane
-                    steps={process.steps || []}
-                    roles={process.roles || []}
-                    stages={process.stages || []}
-                    title="Кросс-функциональная схема (Swimlane)"
-                  />
-                )}
+                <ProcessDiagramSwimlane
+                  steps={process.steps || []}
+                  roles={process.roles || []}
+                  stages={process.stages || []}
+                  title="Кросс-функциональная схема (Swimlane)"
+                />
               </CardContent>
             </Card>
           </TabsContent>
@@ -441,6 +417,18 @@ export default function ProcessView() {
           </TabsContent>
         </Tabs>
       </main>
+
+      <ProcessEditDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        onSubmit={(description) => {
+          applyChangesMutation.mutate({
+            id: processId,
+            changeDescription: description,
+          });
+        }}
+        isLoading={applyChangesMutation.isPending}
+      />
     </div>
   );
 }
