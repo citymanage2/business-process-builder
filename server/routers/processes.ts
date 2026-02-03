@@ -204,7 +204,7 @@ export const processesRouter = router({
       await deleteBusinessProcess(input.id);
       return { success: true };
     }),
-  applyChanges: protectedProcedure
+  previewChanges: protectedProcedure
     .input(z.object({
       id: z.number(),
       changeDescription: z.string(),
@@ -303,26 +303,49 @@ ${JSON.stringify(currentData, null, 2)}
         });
       }
 
+      // Возвращаем preview без сохранения в БД
+      return {
+        success: true,
+        currentData,
+        updatedData,
+        cost, // Передаем стоимость для подтверждения
+      };
+    }),
+  confirmChanges: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      updatedData: z.any(),
+      cost: z.number(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      // Проверяем баланс перед подтверждением
+      const currentBalance = await getUserBalance(ctx.user.id);
+      if (currentBalance < input.cost) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: `Недостаточно токенов. Требуется: ${input.cost}, доступно: ${currentBalance}`,
+        });
+      }
+
       // Обновляем процесс в БД
       await updateBusinessProcess(input.id, {
-        title: updatedData.title,
-        description: updatedData.description,
-        startEvent: updatedData.startEvent,
-        endEvent: updatedData.endEvent,
-        stages: JSON.stringify(updatedData.stages),
-        roles: JSON.stringify(updatedData.roles),
-        steps: JSON.stringify(updatedData.steps),
-        branches: JSON.stringify(updatedData.branches),
-        documents: JSON.stringify(updatedData.documents),
-        itIntegration: JSON.stringify(updatedData.itIntegration),
+        title: input.updatedData.title,
+        description: input.updatedData.description,
+        startEvent: input.updatedData.startEvent,
+        endEvent: input.updatedData.endEvent,
+        stages: JSON.stringify(input.updatedData.stages),
+        roles: JSON.stringify(input.updatedData.roles),
+        steps: JSON.stringify(input.updatedData.steps),
+        branches: JSON.stringify(input.updatedData.branches),
+        documents: JSON.stringify(input.updatedData.documents),
+        itIntegration: JSON.stringify(input.updatedData.itIntegration),
       });
 
       // Списываем токены
-      await deductTokens(ctx.user.id, cost);
+      await deductTokens(ctx.user.id, input.cost);
 
       return {
         success: true,
-        updatedProcess: updatedData,
       };
     }),
 });

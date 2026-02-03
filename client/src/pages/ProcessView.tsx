@@ -24,13 +24,19 @@ export default function ProcessView() {
 
   const { data: process, isLoading, refetch } = trpc.processes.get.useQuery({ id: processId });
   
-  const applyChangesMutation = trpc.processes.applyChanges.useMutation({
+  const previewChangesMutation = trpc.processes.previewChanges.useMutation({
+    onError: (error: any) => {
+      toast.error(`Ошибка генерации предпросмотра: ${error.message}`);
+    },
+  });
+
+  const confirmChangesMutation = trpc.processes.confirmChanges.useMutation({
     onSuccess: () => {
       toast.success("Изменения успешно применены");
       refetch();
       setEditDialogOpen(false);
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast.error(`Ошибка применения изменений: ${error.message}`);
     },
   });
@@ -420,13 +426,21 @@ export default function ProcessView() {
       <ProcessEditDialog
         open={editDialogOpen}
         onOpenChange={setEditDialogOpen}
-        onSubmit={(description) => {
-          applyChangesMutation.mutate({
+        onPreview={async (description: string) => {
+          const result = await previewChangesMutation.mutateAsync({
             id: processId,
             changeDescription: description,
           });
+          return result;
         }}
-        isLoading={applyChangesMutation.isPending}
+        onConfirm={async (updatedData: any, cost: number) => {
+          await confirmChangesMutation.mutateAsync({
+            id: processId,
+            updatedData,
+            cost,
+          });
+        }}
+        isLoading={previewChangesMutation.isPending}
       />
     </div>
   );

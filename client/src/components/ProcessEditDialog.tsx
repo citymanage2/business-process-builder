@@ -9,84 +9,190 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Sparkles } from "lucide-react";
+import { Loader2, Sparkles, ArrowLeft, Check, X } from "lucide-react";
+import ProcessDiffViewer from "./ProcessDiffViewer";
+import { ScrollArea } from "@/components/ui/scroll-area";
+
+interface PreviewData {
+  currentData: any;
+  updatedData: any;
+  cost: number;
+}
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (description: string) => void;
+  onPreview: (description: string) => Promise<PreviewData>;
+  onConfirm: (updatedData: any, cost: number) => Promise<void>;
   isLoading?: boolean;
 }
 
-export default function ProcessEditDialog({ open, onOpenChange, onSubmit, isLoading }: Props) {
+export default function ProcessEditDialog({ 
+  open, 
+  onOpenChange, 
+  onPreview, 
+  onConfirm,
+  isLoading 
+}: Props) {
   const [description, setDescription] = useState("");
+  const [previewData, setPreviewData] = useState<PreviewData | null>(null);
+  const [isConfirming, setIsConfirming] = useState(false);
 
-  const handleSubmit = () => {
+  const handlePreview = async () => {
     if (!description.trim()) return;
-    onSubmit(description);
+    
+    try {
+      const preview = await onPreview(description);
+      setPreviewData(preview);
+    } catch (error) {
+      console.error("Preview error:", error);
+    }
+  };
+
+  const handleConfirm = async () => {
+    if (!previewData) return;
+    
+    setIsConfirming(true);
+    try {
+      await onConfirm(previewData.updatedData, previewData.cost);
+      handleClose();
+    } catch (error) {
+      console.error("Confirm error:", error);
+    } finally {
+      setIsConfirming(false);
+    }
+  };
+
+  const handleBack = () => {
+    setPreviewData(null);
+  };
+
+  const handleClose = () => {
     setDescription("");
+    setPreviewData(null);
+    onOpenChange(false);
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-[800px] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-primary" />
-            Предложить изменения процесса
+            {previewData ? "Предпросмотр изменений" : "Предложить изменения процесса"}
           </DialogTitle>
           <DialogDescription>
-            Опишите, какие изменения нужно внести в бизнес-процесс. AI-ассистент автоматически применит их к структуре процесса.
+            {previewData 
+              ? "Проверьте изменения перед применением. Стоимость операции будет списана после подтверждения."
+              : "Опишите, какие изменения нужно внести в бизнес-процесс. AI-ассистент покажет предпросмотр перед применением."
+            }
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          <Textarea
-            placeholder="Например: Переместить блок 'Согласование договора' из этапа 'Подготовка' в этап 'Исполнение' для роли 'Менеджер'"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={6}
-            disabled={isLoading}
-            className="resize-none"
-          />
+        {!previewData ? (
+          <>
+            <div className="space-y-4 py-4">
+              <Textarea
+                placeholder="Например: Переместить блок 'Согласование договора' из этапа 'Подготовка' в этап 'Исполнение' для роли 'Менеджер'"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={6}
+                disabled={isLoading}
+                className="resize-none"
+              />
 
-          <div className="text-sm text-muted-foreground space-y-1">
-            <p className="font-medium">Примеры команд:</p>
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li>Переместить блок "X" в этап "Y" для роли "Z"</li>
-              <li>Добавить новый блок "Проверка документов" в этап "Контроль"</li>
-              <li>Удалить блок "Старая задача"</li>
-              <li>Изменить название блока "X" на "Y"</li>
-              <li>Добавить новую роль "Координатор"</li>
-            </ul>
-          </div>
-        </div>
+              <div className="text-sm text-muted-foreground space-y-1">
+                <p className="font-medium">Примеры команд:</p>
+                <ul className="list-disc list-inside space-y-1 ml-2">
+                  <li>Переместить блок "X" в этап "Y" для роли "Z"</li>
+                  <li>Добавить новый блок "Проверка документов" в этап "Контроль"</li>
+                  <li>Удалить блок "Старая задача"</li>
+                  <li>Изменить название блока "X" на "Y"</li>
+                  <li>Добавить новую роль "Координатор"</li>
+                </ul>
+              </div>
+            </div>
 
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isLoading}
-          >
-            Отмена
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={!description.trim() || isLoading}
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Применение изменений...
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4 mr-2" />
-                Применить изменения
-              </>
-            )}
-          </Button>
-        </DialogFooter>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={handleClose}
+                disabled={isLoading}
+              >
+                Отмена
+              </Button>
+              <Button
+                onClick={handlePreview}
+                disabled={!description.trim() || isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Генерация предпросмотра...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Показать предпросмотр
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </>
+        ) : (
+          <>
+            <ScrollArea className="flex-1 -mx-6 px-6">
+              <div className="py-4">
+                <ProcessDiffViewer 
+                  currentData={previewData.currentData}
+                  updatedData={previewData.updatedData}
+                />
+              </div>
+            </ScrollArea>
+
+            <div className="border-t pt-4 -mx-6 px-6 bg-muted/30">
+              <div className="flex items-center justify-between mb-4 text-sm">
+                <span className="text-muted-foreground">Стоимость операции:</span>
+                <span className="font-semibold">{previewData.cost} токенов</span>
+              </div>
+              
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={handleBack}
+                  disabled={isConfirming}
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Назад
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleClose}
+                  disabled={isConfirming}
+                >
+                  <X className="w-4 h-4 mr-2" />
+                  Отменить
+                </Button>
+                <Button
+                  onClick={handleConfirm}
+                  disabled={isConfirming}
+                >
+                  {isConfirming ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Применение...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4 mr-2" />
+                      Применить изменения
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </div>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
