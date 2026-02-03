@@ -21,6 +21,7 @@ import CompanyProcesses from "./pages/CompanyProcesses";
 import Admin from "./pages/Admin";
 import AdminSupport from "./pages/AdminSupport";
 import SupportChat from "./components/SupportChat";
+import DebugLogger from "./components/DebugLogger";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -65,6 +66,7 @@ function App() {
           <Toaster />
           <Router />
           <SupportChat />
+          <DebugLogger />
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>
