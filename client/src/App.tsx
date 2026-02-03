@@ -16,6 +16,7 @@ import Interview from "./pages/Interview";
 import FormInterview from "./pages/FormInterview";
 import ProcessGenerate from "./pages/ProcessGenerate";
 import ProcessView from "./pages/ProcessView";
+import DiagramDemo from "./pages/DiagramDemo";
 import Profile from "./pages/Profile";
 import CompanyProcesses from "./pages/CompanyProcesses";
 import Admin from "./pages/Admin";
@@ -39,6 +40,7 @@ function Router() {
       <Route path="/form-interview/:id/:type" component={FormInterview} />
       <Route path="/process/generate/:companyId/:interviewId" component={ProcessGenerate} />
       <Route path="/process/:id" component={ProcessView} />
+      <Route path="/diagram-demo" component={DiagramDemo} />
       <Route path="/profile" component={Profile} />
       <Route path="/company/:id/processes" component={CompanyProcesses} />
       <Route path="/admin" component={Admin} />
