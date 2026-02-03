@@ -263,14 +263,23 @@ ${JSON.stringify(currentData, null, 2)}
 - Сохраняй порядок (order) элементов
 - Если перемещаешь блок, измени его roleId и stageId на соответствующие ID из структуры`;
 
-      const response = await invokeLLM({
-        messages: [
-          { role: "system", content: "Ты эксперт по бизнес-процессам. Применяешь изменения к структуре процессов в формате JSON." },
-          { role: "user", content: prompt },
-        ],
-        response_format: { type: "json_object" },
-        maxTokens: 32768,
-      });
+      let response;
+      try {
+        response = await invokeLLM({
+          messages: [
+            { role: "system", content: "Ты эксперт по бизнес-процессам. Применяешь изменения к структуре процессов в формате JSON." },
+            { role: "user", content: prompt },
+          ],
+          response_format: { type: "json_object" },
+          max_tokens: 16384,
+        });
+      } catch (error) {
+        console.error("[Apply Changes] LLM invocation error:", error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Ошибка при обращении к AI-ассистенту. Попробуйте еще раз.',
+        });
+      }
 
       const content = typeof response.choices[0].message.content === 'string' 
         ? response.choices[0].message.content 
@@ -279,8 +288,15 @@ ${JSON.stringify(currentData, null, 2)}
       let updatedData;
       try {
         updatedData = JSON.parse(content);
+        
+        // Проверяем наличие обязательных полей
+        if (!updatedData.title || !updatedData.stages || !updatedData.roles || !updatedData.steps) {
+          console.error("[Apply Changes] Missing required fields in LLM response");
+          throw new Error("Отсутствуют обязательные поля");
+        }
       } catch (error) {
         console.error("[Apply Changes] JSON parse error:", error);
+        console.error("[Apply Changes] LLM response content:", content);
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Не удалось обработать изменения. Попробуйте еще раз.',
