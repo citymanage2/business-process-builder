@@ -35,6 +35,34 @@ export default function ProcessView() {
 
   const { data: process, isLoading, refetch } = trpc.processes.get.useQuery({ id: processId });
 
+  const updateStepMutation = trpc.processes.updateStep.useMutation({
+    onSuccess: () => {
+      toast.success("Блок успешно обновлён");
+      refetch();
+    },
+    onError: (error: any) => {
+      toast.error(`Ошибка обновления: ${error.message}`);
+    },
+  });
+
+  const deleteStepMutation = trpc.processes.deleteStep.useMutation({
+    onSuccess: () => {
+      toast.success("Блок удалён");
+      refetch();
+    },
+    onError: (error: any) => {
+      toast.error(`Ошибка удаления: ${error.message}`);
+    },
+  });
+
+  const handleStepUpdate = (step: any) => {
+    updateStepMutation.mutate({ processId, step });
+  };
+
+  const handleStepDelete = (stepId: string) => {
+    deleteStepMutation.mutate({ processId, stepId });
+  };
+
   const regenerateMutation = trpc.processes.regenerate.useMutation({
     onSuccess: () => {
       toast.success("Процесс успешно перегенерирован");
@@ -206,6 +234,9 @@ export default function ProcessView() {
                   roles={process.roles || []}
                   stages={process.stages || []}
                   title="Кросс-функциональная схема (Swimlane)"
+                  editable={true}
+                  onStepUpdate={handleStepUpdate}
+                  onStepDelete={handleStepDelete}
                 />
               </CardContent>
             </Card>

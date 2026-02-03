@@ -506,4 +506,128 @@ ${JSON.stringify(currentData, null, 2)}
         newBalance,
       };
     }),
+
+  // Обновление отдельного блока (шага) процесса
+  updateStep: protectedProcedure
+    .input(z.object({
+      processId: z.number(),
+      step: z.object({
+        id: z.string(),
+        stageId: z.string(),
+        roleId: z.string(),
+        type: z.enum(["Start", "Action", "Product", "Decision", "Split", "End"]),
+        name: z.string(),
+        description: z.string().optional(),
+        order: z.number(),
+        parameters: z.array(z.object({
+          type: z.enum(["time", "document", "database", "stage"]),
+          value: z.string(),
+        })).optional(),
+        checklist: z.array(z.string()).optional(),
+        previousSteps: z.array(z.string()).optional(),
+        nextSteps: z.array(z.string()).optional(),
+        branches: z.array(z.object({
+          condition: z.string().optional(),
+          targetStepId: z.string(),
+        })).optional(),
+      }),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      // Получаем текущий процесс
+      const process = await getProcessById(input.processId);
+      if (!process) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Процесс не найден',
+        });
+      }
+
+      // Парсим текущие шаги
+      let steps: any[] = [];
+      try {
+        steps = process.steps ? JSON.parse(process.steps) : [];
+      } catch (e) {
+        console.error("Failed to parse steps", e);
+        steps = [];
+      }
+
+      // Находим и обновляем шаг
+      const stepIndex = steps.findIndex((s: any) => s.id === input.step.id);
+      if (stepIndex === -1) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Блок не найден в процессе',
+        });
+      }
+
+      // Обновляем шаг
+      steps[stepIndex] = input.step;
+
+      // Сохраняем обновленные шаги
+      await updateBusinessProcess(input.processId, {
+        steps: JSON.stringify(steps),
+      });
+
+      console.log(`[Process] Step ${input.step.id} updated in process ${input.processId}`);
+
+      return {
+        success: true,
+        step: input.step,
+      };
+    }),
+
+  // Удаление блока (шага) из процесса
+  deleteStep: protectedProcedure
+    .input(z.object({
+      processId: z.number(),
+      stepId: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      // Получаем текущий процесс
+      const process = await getProcessById(input.processId);
+      if (!process) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Процесс не найден',
+        });
+      }
+
+      // Парсим текущие шаги
+      let steps: any[] = [];
+      try {
+        steps = process.steps ? JSON.parse(process.steps) : [];
+      } catch (e) {
+        console.error("Failed to parse steps", e);
+        steps = [];
+      }
+
+      // Удаляем шаг
+      const filteredSteps = steps.filter((s: any) => s.id !== input.stepId);
+      
+      if (filteredSteps.length === steps.length) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Блок не найден в процессе',
+        });
+      }
+
+      // Удаляем ссылки на удаленный шаг из других шагов
+      const cleanedSteps = filteredSteps.map((step: any) => ({
+        ...step,
+        previousSteps: step.previousSteps?.filter((id: string) => id !== input.stepId),
+        nextSteps: step.nextSteps?.filter((id: string) => id !== input.stepId),
+        branches: step.branches?.filter((b: any) => b.targetStepId !== input.stepId),
+      }));
+
+      // Сохраняем обновленные шаги
+      await updateBusinessProcess(input.processId, {
+        steps: JSON.stringify(cleanedSteps),
+      });
+
+      console.log(`[Process] Step ${input.stepId} deleted from process ${input.processId}`);
+
+      return {
+        success: true,
+      };
+    }),
 });
