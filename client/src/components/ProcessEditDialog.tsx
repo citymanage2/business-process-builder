@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Sparkles, ArrowLeft, Check, X } from "lucide-react";
 import ProcessDiffViewer from "./ProcessDiffViewer";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import ProgressIndicator from "./ProgressIndicator";
 
 interface PreviewData {
   currentData: any;
@@ -94,6 +95,18 @@ export default function ProcessEditDialog({
         {!previewData ? (
           <>
             <div className="space-y-4 py-4">
+              {isLoadingPreview && (
+                <div className="mb-4">
+                  <ProgressIndicator
+                    stages={[
+                      { label: "Анализ текущей структуры процесса", duration: 2000 },
+                      { label: "Обработка запроса изменений", duration: 3000 },
+                      { label: "Генерация обновленной структуры", duration: 4000 },
+                      { label: "Подготовка предпросмотра", duration: 2000 },
+                    ]}
+                  />
+                </div>
+              )}
               <Textarea
                 placeholder="Например: Переместить блок 'Согласование договора' из этапа 'Подготовка' в этап 'Исполнение' для роли 'Менеджер'"
                 value={description}
@@ -130,7 +143,7 @@ export default function ProcessEditDialog({
                 {isLoadingPreview ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Генерация предпросмотра...
+                    Генерация...
                   </>
                 ) : (
                   <>
@@ -157,6 +170,19 @@ export default function ProcessEditDialog({
                 <span className="text-muted-foreground">Стоимость операции:</span>
                 <span className="font-semibold">{previewData.cost} токенов</span>
               </div>
+              
+              {isConfirming && (
+                <div className="mb-4">
+                  <ProgressIndicator
+                    stages={[
+                      { label: "Проверка баланса токенов", duration: 1000 },
+                      { label: "Сохранение изменений в базу данных", duration: 2000 },
+                      { label: "Списание токенов", duration: 1000 },
+                      { label: "Обновление процесса", duration: 1500 },
+                    ]}
+                  />
+                </div>
+              )}
               
               <DialogFooter>
                 <Button
