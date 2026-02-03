@@ -440,7 +440,6 @@ export default function ProcessView() {
             cost,
           });
         }}
-        isLoading={previewChangesMutation.isPending}
       />
     </div>
   );

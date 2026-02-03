@@ -24,28 +24,30 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   onPreview: (description: string) => Promise<PreviewData>;
   onConfirm: (updatedData: any, cost: number) => Promise<void>;
-  isLoading?: boolean;
 }
 
 export default function ProcessEditDialog({ 
   open, 
   onOpenChange, 
   onPreview, 
-  onConfirm,
-  isLoading 
+  onConfirm
 }: Props) {
   const [description, setDescription] = useState("");
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
 
   const handlePreview = async () => {
     if (!description.trim()) return;
     
+    setIsLoadingPreview(true);
     try {
       const preview = await onPreview(description);
       setPreviewData(preview);
     } catch (error) {
       console.error("Preview error:", error);
+    } finally {
+      setIsLoadingPreview(false);
     }
   };
 
@@ -97,7 +99,7 @@ export default function ProcessEditDialog({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={6}
-                disabled={isLoading}
+                disabled={isLoadingPreview}
                 className="resize-none"
               />
 
@@ -117,15 +119,15 @@ export default function ProcessEditDialog({
               <Button
                 variant="outline"
                 onClick={handleClose}
-                disabled={isLoading}
+                disabled={isLoadingPreview}
               >
                 Отмена
               </Button>
               <Button
                 onClick={handlePreview}
-                disabled={!description.trim() || isLoading}
+                disabled={!description.trim() || isLoadingPreview}
               >
-                {isLoading ? (
+                {isLoadingPreview ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     Генерация предпросмотра...
