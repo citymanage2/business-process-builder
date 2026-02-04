@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ZoomIn, ZoomOut, Maximize2, Download, RotateCcw, Edit3 } from "lucide-react";
+import { ZoomIn, ZoomOut, Maximize2, Download, RotateCcw, Edit3, FileCode } from "lucide-react";
+import { downloadBPMNFile } from "@/lib/bpmnExport";
 import BlockEditor from "./BlockEditor";
 
 interface Role {
@@ -888,6 +889,17 @@ export default function ProcessDiagramSwimlane({
     link.click();
   };
 
+  const handleExportBPMN = () => {
+    const processData = {
+      id: title.replace(/[^a-zA-Z0-9]/g, "_") || "process",
+      name: title || "Бизнес-процесс",
+      roles,
+      stages,
+      steps,
+    };
+    downloadBPMNFile(processData, `${title || "process"}.bpmn`);
+  };
+
   return (
     <Card className="p-4">
       <div className="flex items-center justify-between mb-4">
@@ -910,6 +922,9 @@ export default function ProcessDiagramSwimlane({
           </Button>
           <Button variant="outline" size="icon" onClick={handleExportPNG} title="Экспорт PNG">
             <Download className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" size="icon" onClick={handleExportBPMN} title="Экспорт BPMN XML">
+            <FileCode className="h-4 w-4" />
           </Button>
         </div>
       </div>

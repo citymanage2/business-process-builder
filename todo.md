@@ -846,3 +846,10 @@
 - [ ] Association: пунктир для связи с Data Object, Data Store, Text Annotation
 - [ ] Ортогональные коннекторы без пересечений
 - [ ] Стрелки обходят блоки, не проходят через них
+
+## Экспорт в BPMN XML (04.02.2026)
+- [x] Создать функцию генерации BPMN 2.0 XML из данных процесса (client/src/lib/bpmnExport.ts)
+- [x] Добавить маппинг типов блоков на BPMN элементы (startEvent, endEvent, task, exclusiveGateway, parallelGateway)
+- [x] Генерировать BPMNDiagram с координатами для визуализации
+- [x] Добавить кнопку "Экспорт BPMN XML" в UI диаграммы (FileCode иконка)
+- [x] Реализовать скачивание файла .bpmn (downloadBPMNFile)
