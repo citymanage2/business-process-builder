@@ -22,16 +22,23 @@ import RequiredDocuments from "@/components/RequiredDocuments";
 import StageDetails from "@/components/StageDetails";
 import ProgressIndicator from "@/components/ProgressIndicator";
 import { trpc } from "@/lib/trpc";
-import { Loader2, Sparkles, TrendingUp, AlertTriangle, Target, Download, RefreshCw } from "lucide-react";
+import { Loader2, Sparkles, TrendingUp, AlertTriangle, Target, Download, RefreshCw, MessageSquarePlus, History } from "lucide-react";
 import { toast } from "sonner";
 import { exportProcessToPDF } from "@/lib/pdfExport";
 import { OPERATION_COSTS } from "@shared/costs";
+import { ChangeRequestPanel } from "@/components/ChangeRequestPanel";
+import {
+  Dialog,
+  DialogContent,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 export default function ProcessView() {
   const [, params] = useRoute("/process/:id");
   const processId = params?.id ? parseInt(params.id) : 0;
   const [regenerateDialogOpen, setRegenerateDialogOpen] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [changeRequestDialogOpen, setChangeRequestDialogOpen] = useState(false);
 
   const { data: process, isLoading, refetch } = trpc.processes.get.useQuery({ id: processId });
 
@@ -196,13 +203,23 @@ export default function ProcessView() {
                     </CardDescription>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <ProcessModificationDialog
-                      processId={processId}
-                      onSubmit={(request) => {
-                        console.log("Запрос на изменение:", request);
-                        toast.info("Функция в разработке");
-                      }}
-                    />
+                    <Dialog open={changeRequestDialogOpen} onOpenChange={setChangeRequestDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="default" size="sm" className="gap-2">
+                          <MessageSquarePlus className="w-4 h-4" />
+                          Запросить изменения
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                        <ChangeRequestPanel 
+                          businessProcessId={processId} 
+                          onClose={() => {
+                            setChangeRequestDialogOpen(false);
+                            refetch();
+                          }}
+                        />
+                      </DialogContent>
+                    </Dialog>
                     <Button
                       variant="outline"
                       size="sm"

@@ -224,4 +224,79 @@ export const faqArticles = pgTable("faq_articles", {
 export type FaqArticle = typeof faqArticles.$inferSelect;
 export type InsertFaqArticle = typeof faqArticles.$inferInsert;
 
+// Enums for change requests
+export const changeRequestStatusEnum = pgEnum("change_request_status", [
+  "pending",      // Запрос создан, ожидает обработки
+  "processing",   // AI обрабатывает запрос
+  "preview",      // Изменения готовы к предпросмотру
+  "applied",      // Изменения применены
+  "rejected",     // Изменения отклонены
+  "rolled_back"   // Изменения откачены
+]);
+
+// Change Requests table - запросы на изменения бизнес-процесса
+export const changeRequests = pgTable("change_requests", {
+  id: serial("id").primaryKey(),
+  businessProcessId: integer("business_process_id").notNull().references(() => businessProcesses.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  status: changeRequestStatusEnum("status").default("pending").notNull(),
+  
+  // Запрос пользователя
+  requestText: text("request_text").notNull(), // Описание желаемых изменений
+  requestType: varchar("request_type", { length: 50 }), // add_step, modify_step, delete_step, change_flow, optimize
+  targetStepId: varchar("target_step_id", { length: 100 }), // ID шага, если изменение касается конкретного шага
+  
+  // Результат обработки AI
+  proposedChanges: text("proposed_changes"), // JSON с предлагаемыми изменениями
+  changesSummary: text("changes_summary"), // Краткое описание изменений для пользователя
+  
+  // Прогресс обработки
+  progress: integer("progress").default(0), // 0-100%
+  progressMessage: varchar("progress_message", { length: 255 }), // Текущий этап обработки
+  
+  // Связь с версиями
+  previousVersionId: integer("previous_version_id"), // ID версии до изменений
+  newVersionId: integer("new_version_id"), // ID версии после изменений
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  appliedAt: timestamp("applied_at"), // Когда изменения были применены
+  rolledBackAt: timestamp("rolled_back_at"), // Когда изменения были откачены
+});
+
+export type ChangeRequest = typeof changeRequests.$inferSelect;
+export type InsertChangeRequest = typeof changeRequests.$inferInsert;
+
+// Process Versions table - версии бизнес-процессов для отката
+export const processVersions = pgTable("process_versions", {
+  id: serial("id").primaryKey(),
+  businessProcessId: integer("business_process_id").notNull().references(() => businessProcesses.id, { onDelete: "cascade" }),
+  versionNumber: integer("version_number").notNull(),
+  
+  // Снимок данных процесса
+  title: varchar("title", { length: 500 }).notNull(),
+  description: text("description"),
+  stages: text("stages"),
+  roles: text("roles"),
+  steps: text("steps"),
+  branches: text("branches"),
+  documents: text("documents"),
+  itIntegration: text("it_integration"),
+  diagramData: text("diagram_data"),
+  stageDetails: text("stage_details"),
+  totalTime: integer("total_time"),
+  totalCost: integer("total_cost"),
+  
+  // Метаданные версии
+  changeRequestId: integer("change_request_id"), // ID запроса, который создал эту версию
+  changeSummary: text("change_summary"), // Описание изменений в этой версии
+  createdById: integer("created_by_id").references(() => users.id, { onDelete: "set null" }),
+  isActive: integer("is_active").default(0).notNull(), // 1 = текущая активная версия
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type ProcessVersion = typeof processVersions.$inferSelect;
+export type InsertProcessVersion = typeof processVersions.$inferInsert;
+
 

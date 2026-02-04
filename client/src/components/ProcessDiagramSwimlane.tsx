@@ -607,7 +607,7 @@ export default function ProcessDiagramSwimlane({
       drawBlockInfo(ctx, step, x + 20, y + 80, BLOCK_WIDTH - 40, "#C62828");
     }
 
-    // ПОЛНЫЙ ОБХОД БЛОКОВ - стрелки НИКОГДА не проходят через блоки
+    // УЛУЧШЕННЫЙ АЛГОРИТМ ОБХОДА БЛОКОВ - стрелки НИКОГДА не проходят через блоки
     function drawSmartConnection(
       ctx: CanvasRenderingContext2D,
       from: BlockPosition,
@@ -615,35 +615,29 @@ export default function ProcessDiagramSwimlane({
       allPositions: Record<string, BlockPosition>,
       label?: string
     ) {
-      ctx.strokeStyle = "#333";
-      ctx.lineWidth = 3;
+      // Цвет стрелки зависит от наличия метки (условия)
+      const isConditional = !!label;
+      ctx.strokeStyle = isConditional ? "#E65100" : "#333";
+      ctx.lineWidth = isConditional ? 4 : 3;
       ctx.setLineDash([]);
 
-      const sameColumn = from.roleIndex === to.roleIndex;
-      const goingDown = to.y > from.y;
-      const goingRight = to.roleIndex > from.roleIndex;
-      
-      // Находим все блоки между исходным и целевым
       const allBlocks = Object.values(allPositions);
       
-      // Функция проверки пересечения линии с блоком
+      // Проверка пересечения линии с блоком
       function lineIntersectsBlock(x1: number, y1: number, x2: number, y2: number, block: BlockPosition): boolean {
         if (block.step.id === from.step.id || block.step.id === to.step.id) return false;
         
-        const padding = 10;
+        const padding = 15;
         const bx1 = block.x - padding;
         const by1 = block.y - padding;
         const bx2 = block.x + block.width + padding;
         const by2 = block.y + block.height + padding;
         
-        // Проверяем пересечение отрезка с прямоугольником
-        // Горизонтальная линия
         if (y1 === y2) {
           const minX = Math.min(x1, x2);
           const maxX = Math.max(x1, x2);
           return y1 >= by1 && y1 <= by2 && maxX >= bx1 && minX <= bx2;
         }
-        // Вертикальная линия
         if (x1 === x2) {
           const minY = Math.min(y1, y2);
           const maxY = Math.max(y1, y2);
@@ -652,14 +646,13 @@ export default function ProcessDiagramSwimlane({
         return false;
       }
       
-      // Находим безопасную Y-координату для горизонтального сегмента
-      function findSafeHorizontalY(startX: number, endX: number, preferredY: number, direction: 'up' | 'down'): number {
+      // Найти безопасную Y-координату для горизонтального сегмента
+      function findSafeY(startX: number, endX: number, preferredY: number, direction: 'up' | 'down'): number {
         let safeY = preferredY;
-        const step = direction === 'up' ? -20 : 20;
+        const step = direction === 'up' ? -30 : 30;
         let attempts = 0;
-        const maxAttempts = 50;
         
-        while (attempts < maxAttempts) {
+        while (attempts < 100) {
           let isSafe = true;
           for (const block of allBlocks) {
             if (block.step.id === from.step.id || block.step.id === to.step.id) continue;
@@ -675,14 +668,13 @@ export default function ProcessDiagramSwimlane({
         return preferredY;
       }
       
-      // Находим безопасную X-координату для вертикального сегмента
-      function findSafeVerticalX(startY: number, endY: number, preferredX: number, direction: 'left' | 'right'): number {
+      // Найти безопасную X-координату для вертикального сегмента
+      function findSafeX(startY: number, endY: number, preferredX: number, direction: 'left' | 'right'): number {
         let safeX = preferredX;
-        const step = direction === 'left' ? -20 : 20;
+        const step = direction === 'left' ? -30 : 30;
         let attempts = 0;
-        const maxAttempts = 50;
         
-        while (attempts < maxAttempts) {
+        while (attempts < 100) {
           let isSafe = true;
           for (const block of allBlocks) {
             if (block.step.id === from.step.id || block.step.id === to.step.id) continue;
@@ -698,52 +690,72 @@ export default function ProcessDiagramSwimlane({
         return preferredX;
       }
 
+      const sameColumn = from.roleIndex === to.roleIndex;
+      const goingDown = to.y > from.y;
+      const goingRight = to.roleIndex > from.roleIndex;
+
+      // Находим глобальные границы всех блоков
+      let globalMinY = Infinity;
+      let globalMaxY = 0;
+      let globalMinX = Infinity;
+      let globalMaxX = 0;
+      
+      allBlocks.forEach(b => {
+        globalMinY = Math.min(globalMinY, b.y);
+        globalMaxY = Math.max(globalMaxY, b.y + b.height);
+        globalMinX = Math.min(globalMinX, b.x);
+        globalMaxX = Math.max(globalMaxX, b.x + b.width);
+      });
+
       if (sameColumn) {
         if (goingDown) {
-          // Вниз в той же колонке - простая вертикальная линия
+          // Вниз в той же колонке
           const startX = from.centerX;
           const startY = from.y + from.height;
           const endX = to.centerX;
           const endY = to.y;
           
-          // Проверяем, есть ли блоки между
+          // Проверяем блоки между
           let hasBlockBetween = false;
           for (const block of allBlocks) {
             if (block.step.id === from.step.id || block.step.id === to.step.id) continue;
             if (block.roleIndex === from.roleIndex && 
-                block.y > from.y + from.height && 
-                block.y + block.height < to.y) {
+                block.y + block.height > startY && 
+                block.y < endY) {
               hasBlockBetween = true;
               break;
             }
           }
           
           if (!hasBlockBetween) {
-            // Прямая линия
             ctx.beginPath();
             ctx.moveTo(startX, startY);
             ctx.lineTo(endX, endY);
             ctx.stroke();
-            drawArrowHead(ctx, endX, endY, Math.PI / 2);
+            drawArrowHead(ctx, endX, endY, Math.PI / 2, isConditional);
           } else {
-            // Обходим слева
-            const offsetX = from.x - CONNECTION_GAP;
-            const safeX = findSafeVerticalX(startY, endY, offsetX, 'left');
+            // Обходим слева от всех блоков в колонке
+            const offsetX = globalMinX - CONNECTION_GAP * 2;
+            const safeX = findSafeX(startY, endY, offsetX, 'left');
             
             ctx.beginPath();
             ctx.moveTo(startX, startY);
-            ctx.lineTo(startX, startY + 20);
-            ctx.lineTo(safeX, startY + 20);
-            ctx.lineTo(safeX, endY - 20);
-            ctx.lineTo(endX, endY - 20);
+            ctx.lineTo(startX, startY + 25);
+            ctx.lineTo(safeX, startY + 25);
+            ctx.lineTo(safeX, endY - 25);
+            ctx.lineTo(endX, endY - 25);
             ctx.lineTo(endX, endY);
             ctx.stroke();
-            drawArrowHead(ctx, endX, endY, Math.PI / 2);
+            drawArrowHead(ctx, endX, endY, Math.PI / 2, isConditional);
+          }
+          
+          if (label) {
+            drawConnectionLabel(ctx, startX + 60, startY + 40, label);
           }
         } else {
           // Вверх в той же колонке - обходим СЛЕВА
-          const offsetX = from.x - CONNECTION_GAP;
-          const safeX = findSafeVerticalX(to.centerY, from.centerY, offsetX, 'left');
+          const offsetX = globalMinX - CONNECTION_GAP * 2;
+          const safeX = findSafeX(to.centerY, from.centerY, offsetX, 'left');
           
           ctx.beginPath();
           ctx.moveTo(from.x, from.centerY);
@@ -751,56 +763,34 @@ export default function ProcessDiagramSwimlane({
           ctx.lineTo(safeX, to.centerY);
           ctx.lineTo(to.x, to.centerY);
           ctx.stroke();
-          drawArrowHead(ctx, to.x, to.centerY, Math.PI);
-        }
-        
-        if (label) {
-          const labelX = from.x - CONNECTION_GAP - 30;
-          const labelY = (from.centerY + to.centerY) / 2;
-          drawConnectionLabel(ctx, labelX, labelY, label);
+          drawArrowHead(ctx, to.x, to.centerY, Math.PI, isConditional);
+          
+          if (label) {
+            drawConnectionLabel(ctx, safeX - 40, (from.centerY + to.centerY) / 2, label);
+          }
         }
       } else {
-        // Связь между разными колонками
-        // Всегда выходим снизу/сверху и обходим все блоки
+        // Связь между разными колонками - ВСЕГДА обходим СНИЗУ или СВЕРХУ ВСЕХ блоков
         
-        // Находим все блоки между колонками
-        const minRoleIndex = Math.min(from.roleIndex, to.roleIndex);
-        const maxRoleIndex = Math.max(from.roleIndex, to.roleIndex);
+        // Вычисляем безопасные маршруты
+        const topRoute = globalMinY - CONNECTION_GAP * 1.5;
+        const bottomRoute = globalMaxY + CONNECTION_GAP * 1.5;
         
-        const blocksBetween = allBlocks.filter(b => 
-          b.roleIndex >= minRoleIndex && 
-          b.roleIndex <= maxRoleIndex &&
-          b.step.id !== from.step.id &&
-          b.step.id !== to.step.id
-        );
+        // Выбираем маршрут в зависимости от позиции блоков
+        // Если целевой блок ниже - идём снизу, иначе сверху
+        const useBottom = to.y >= from.y;
+        let routeY = useBottom ? bottomRoute : topRoute;
         
-        // Находим безопасную Y-координату для горизонтального сегмента
-        // Предпочитаем идти сверху или снизу всех блоков
-        let minY = ROLE_HEADER_HEIGHT;
-        let maxY = ROLE_HEADER_HEIGHT;
-        
-        blocksBetween.forEach(b => {
-          minY = Math.min(minY, b.y);
-          maxY = Math.max(maxY, b.y + b.height);
-        });
-        minY = Math.min(minY, from.y, to.y);
-        maxY = Math.max(maxY, from.y + from.height, to.y + to.height);
-        
-        // Выбираем путь: сверху или снизу
-        const topRoute = minY - CONNECTION_GAP;
-        const bottomRoute = maxY + CONNECTION_GAP;
-        
-        // Выбираем более короткий путь
-        const useTop = topRoute > ROLE_HEADER_HEIGHT + 20;
-        const routeY = useTop ? topRoute : bottomRoute;
+        // Проверяем безопасность маршрута
+        routeY = findSafeY(from.centerX, to.centerX, routeY, useBottom ? 'down' : 'up');
         
         // Точки выхода и входа
         const startX = from.centerX;
-        const startY = useTop ? from.y : from.y + from.height;
+        const startY = useBottom ? from.y + from.height : from.y;
         const endX = to.centerX;
-        const endY = useTop ? to.y : to.y + to.height;
+        const endY = useBottom ? to.y + to.height : to.y;
         
-        // Рисуем путь: вертикально → горизонтально → вертикально
+        // Рисуем путь
         ctx.beginPath();
         ctx.moveTo(startX, startY);
         ctx.lineTo(startX, routeY);
@@ -809,13 +799,13 @@ export default function ProcessDiagramSwimlane({
         ctx.stroke();
         
         // Стрелка
-        const arrowAngle = useTop ? -Math.PI / 2 : Math.PI / 2;
-        drawArrowHead(ctx, endX, endY, arrowAngle);
+        const arrowAngle = useBottom ? -Math.PI / 2 : Math.PI / 2;
+        drawArrowHead(ctx, endX, endY, arrowAngle, isConditional);
         
-        // Метка
+        // Метка условия
         if (label) {
           const labelX = (startX + endX) / 2;
-          const labelY = routeY + (useTop ? -15 : 15);
+          const labelY = routeY + (useBottom ? 20 : -20);
           drawConnectionLabel(ctx, labelX, labelY, label);
         }
       }
@@ -837,11 +827,11 @@ export default function ProcessDiagramSwimlane({
       ctx.fillText(label, x, y);
     }
 
-    function drawArrowHead(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number) {
-      const headLength = 14;
+    function drawArrowHead(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number, isConditional: boolean = false) {
+      const headLength = isConditional ? 18 : 14;
       const headAngle = Math.PI / 6;
       
-      ctx.fillStyle = "#333";
+      ctx.fillStyle = isConditional ? "#E65100" : "#333";
       ctx.beginPath();
       ctx.moveTo(x, y);
       ctx.lineTo(

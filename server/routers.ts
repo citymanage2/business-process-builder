@@ -13,6 +13,7 @@ import { draftsRouter } from "./routers/drafts";
 import { adminRouter } from "./routers/admin";
 import { supportRouter } from "./routers/support";
 import { faqRouter } from "./routers/faq";
+import { changeRequestsRouter } from "./routers/changeRequests";
 
 export const appRouter = router({
   system: systemRouter,
@@ -27,6 +28,7 @@ export const appRouter = router({
   admin: adminRouter,
   support: supportRouter,
   faq: faqRouter,
+  changeRequests: changeRequestsRouter,
 });
 
 export type AppRouter = typeof appRouter;
