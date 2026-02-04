@@ -833,3 +833,16 @@
 - [x] Создать таблицы change_requests и process_versions в production БД
 - [x] Добавить DialogTitle и DialogDescription для доступности
 - [x] Добавить DialogHeader в ProcessView
+
+## Переделка стрелок по BPMN 2.0 (04.02.2026)
+### Удаление старого кода
+- [ ] Удалить все функции отрисовки стрелок (drawSmartConnection, drawArrowHead и т.д.)
+- [ ] Удалить вызовы отрисовки связей в drawDiagram
+### Новая логика стрелок по BPMN 2.0
+- [ ] Sequence Flow: сплошная линия со стрелкой между Flow Objects (Task, Gateway, Event)
+- [ ] Подписи условий на ветках из XOR Gateway в квадратных скобках [условие]
+- [ ] Default ветка помечается косой чертой
+- [ ] Message Flow: пунктирная линия между Pool-ами (если есть)
+- [ ] Association: пунктир для связи с Data Object, Data Store, Text Annotation
+- [ ] Ортогональные коннекторы без пересечений
+- [ ] Стрелки обходят блоки, не проходят через них
