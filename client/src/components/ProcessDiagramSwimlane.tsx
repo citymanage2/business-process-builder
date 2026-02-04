@@ -17,7 +17,7 @@ interface Stage {
 }
 
 interface ActionParameter {
-  type: "time" | "document" | "database" | "stage";
+  type: "time" | "document" | "database" | "stage" | "environment";
   value: string;
 }
 
@@ -51,6 +51,16 @@ interface ProcessDiagramSwimlaneProps {
   onStepDelete?: (stepId: string) => void;
 }
 
+interface BlockPosition {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  roleIndex: number;
+  centerX: number;
+  centerY: number;
+}
+
 export default function ProcessDiagramSwimlane({ 
   roles, 
   stages, 
@@ -62,7 +72,7 @@ export default function ProcessDiagramSwimlane({
 }: ProcessDiagramSwimlaneProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [zoom, setZoom] = useState(0.28);
+  const [zoom, setZoom] = useState(0.35);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
@@ -71,14 +81,16 @@ export default function ProcessDiagramSwimlane({
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [hoveredStepId, setHoveredStepId] = useState<string | null>(null);
   
-  const stepPositionsRef = useRef<Record<string, { x: number; y: number; width: number; height: number; roleIndex: number }>>({});
+  const stepPositionsRef = useRef<Record<string, BlockPosition>>({});
 
-  // МАКСИМАЛЬНЫЕ размеры для полной читаемости
-  const ROLE_HEADER_HEIGHT = 160;
-  const LANE_WIDTH = 780;
-  const BLOCK_WIDTH = 700;
-  const BLOCK_HEIGHT = 500;
-  const BLOCK_MARGIN_Y = 120;
+  // Компактные размеры блоков для лучшего обзора
+  const ROLE_HEADER_HEIGHT = 80;
+  const LANE_WIDTH = 220;
+  const BLOCK_WIDTH = 180;
+  const BLOCK_HEIGHT = 120;
+  const BLOCK_MARGIN_X = 20;
+  const BLOCK_MARGIN_Y = 40;
+  const CONNECTION_OFFSET = 30; // Отступ для обхода блоков
 
   const ROLE_COLORS = [
     "#B3E5FC", "#F8BBD9", "#C8E6C9", "#FFF9C4", "#E1BEE7",
@@ -101,7 +113,7 @@ export default function ProcessDiagramSwimlane({
     return truncated + "...";
   }, []);
 
-  // Улучшенная функция переноса текста с ограничением строк
+  // Функция переноса текста
   const wrapText = useCallback((
     ctx: CanvasRenderingContext2D,
     text: string,
@@ -109,7 +121,7 @@ export default function ProcessDiagramSwimlane({
     y: number,
     maxWidth: number,
     lineHeight: number,
-    maxLines: number = 3
+    maxLines: number = 2
   ): number => {
     const words = text.split(" ");
     let line = "";
@@ -137,19 +149,30 @@ export default function ProcessDiagramSwimlane({
     return currentY + lineHeight;
   }, [truncateText]);
 
+  // ИСПРАВЛЕННЫЙ расчёт координат мыши на canvas
+  const getCanvasCoordinates = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    
+    const rect = canvas.getBoundingClientRect();
+    
+    // Координаты клика относительно canvas элемента
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+    
+    // Преобразуем в координаты canvas с учётом pan и zoom
+    const canvasX = (clickX - pan.x) / zoom;
+    const canvasY = (clickY - pan.y) / zoom;
+    
+    return { x: canvasX, y: canvasY };
+  }, [pan, zoom]);
+
   const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!editable || isDragging) return;
     
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const { x: clickX, y: clickY } = getCanvasCoordinates(e);
     
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    
-    const clickX = ((e.clientX - rect.left) * scaleX - pan.x) / zoom;
-    const clickY = ((e.clientY - rect.top) * scaleY - pan.y) / zoom;
-    
+    // Проверяем попадание в блоки
     for (const [stepId, pos] of Object.entries(stepPositionsRef.current)) {
       if (clickX >= pos.x && clickX <= pos.x + pos.width &&
           clickY >= pos.y && clickY <= pos.y + pos.height) {
@@ -161,33 +184,26 @@ export default function ProcessDiagramSwimlane({
         return;
       }
     }
-  }, [editable, isDragging, pan, zoom, steps]);
+  }, [editable, isDragging, getCanvasCoordinates, steps]);
 
   const handleCanvasMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!editable) return;
     
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const { x: mouseX, y: mouseY } = getCanvasCoordinates(e);
     
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    
-    const mouseX = ((e.clientX - rect.left) * scaleX - pan.x) / zoom;
-    const mouseY = ((e.clientY - rect.top) * scaleY - pan.y) / zoom;
-    
-    let foundHovered = false;
+    let foundHovered: string | null = null;
     for (const [stepId, pos] of Object.entries(stepPositionsRef.current)) {
       if (mouseX >= pos.x && mouseX <= pos.x + pos.width &&
           mouseY >= pos.y && mouseY <= pos.y + pos.height) {
-        if (hoveredStepId !== stepId) setHoveredStepId(stepId);
-        foundHovered = true;
+        foundHovered = stepId;
         break;
       }
     }
     
-    if (!foundHovered && hoveredStepId) setHoveredStepId(null);
-  }, [editable, pan, zoom, hoveredStepId]);
+    if (foundHovered !== hoveredStepId) {
+      setHoveredStepId(foundHovered);
+    }
+  }, [editable, getCanvasCoordinates, hoveredStepId]);
 
   const handleStepSave = useCallback((updatedStep: Step) => {
     if (onStepUpdate) onStepUpdate(updatedStep);
@@ -211,120 +227,133 @@ export default function ProcessDiagramSwimlane({
     const sortedRoles = [...roles];
     const sortedStages = [...stages].sort((a, b) => a.order - b.order);
 
+    // Группируем шаги по ролям
     const stepsByRole: Record<string, Step[]> = {};
     steps.forEach(step => {
       if (!stepsByRole[step.roleId]) stepsByRole[step.roleId] = [];
       stepsByRole[step.roleId].push(step);
     });
 
+    // Сортируем шаги внутри каждой роли по order
     Object.keys(stepsByRole).forEach(roleId => {
       stepsByRole[roleId].sort((a, b) => a.order - b.order);
     });
 
+    // Находим максимальное количество шагов в одной роли
     let maxStepsInRole = 0;
     Object.values(stepsByRole).forEach(roleSteps => {
       maxStepsInRole = Math.max(maxStepsInRole, roleSteps.length);
     });
 
-    const canvasWidth = sortedRoles.length * LANE_WIDTH + 200;
-    const canvasHeight = ROLE_HEADER_HEIGHT + maxStepsInRole * (BLOCK_HEIGHT + BLOCK_MARGIN_Y * 2) + 800;
+    const canvasWidth = sortedRoles.length * LANE_WIDTH + 100;
+    const canvasHeight = ROLE_HEADER_HEIGHT + maxStepsInRole * (BLOCK_HEIGHT + BLOCK_MARGIN_Y) + 200;
 
     canvas.width = canvasWidth;
     canvas.height = canvasHeight;
 
+    // Очищаем canvas
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-    const stepPositions: Record<string, { x: number; y: number; width: number; height: number; roleIndex: number }> = {};
+    const stepPositions: Record<string, BlockPosition> = {};
 
+    // Рисуем дорожки (swimlanes) и блоки
     sortedRoles.forEach((role, roleIndex) => {
-      const x = roleIndex * LANE_WIDTH;
+      const laneX = roleIndex * LANE_WIDTH;
       const color = role.color || ROLE_COLORS[roleIndex % ROLE_COLORS.length];
 
+      // Фон дорожки
       ctx.fillStyle = color;
-      ctx.fillRect(x, 0, LANE_WIDTH, canvasHeight);
+      ctx.fillRect(laneX, 0, LANE_WIDTH, canvasHeight);
 
+      // Граница дорожки
       ctx.strokeStyle = "#666";
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(x + LANE_WIDTH, 0);
-      ctx.lineTo(x + LANE_WIDTH, canvasHeight);
+      ctx.moveTo(laneX + LANE_WIDTH, 0);
+      ctx.lineTo(laneX + LANE_WIDTH, canvasHeight);
       ctx.stroke();
 
+      // Заголовок роли
       ctx.fillStyle = "#ffffff";
-      ctx.fillRect(x, 0, LANE_WIDTH, ROLE_HEADER_HEIGHT);
+      ctx.fillRect(laneX, 0, LANE_WIDTH, ROLE_HEADER_HEIGHT);
       ctx.strokeStyle = "#333";
-      ctx.lineWidth = 4;
-      ctx.strokeRect(x, 0, LANE_WIDTH, ROLE_HEADER_HEIGHT);
+      ctx.lineWidth = 2;
+      ctx.strokeRect(laneX, 0, LANE_WIDTH, ROLE_HEADER_HEIGHT);
 
       ctx.fillStyle = "#1a1a1a";
-      ctx.font = "bold 32px Arial, sans-serif";
+      ctx.font = "bold 14px Arial, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       
-      const maxRoleWidth = LANE_WIDTH - 80;
-      wrapText(ctx, role.name, x + LANE_WIDTH / 2, ROLE_HEADER_HEIGHT / 2, maxRoleWidth, 40, 3);
+      wrapText(ctx, role.name, laneX + LANE_WIDTH / 2, ROLE_HEADER_HEIGHT / 2, LANE_WIDTH - 20, 18, 2);
 
+      // Рисуем блоки для этой роли
       const roleSteps = stepsByRole[role.id] || [];
       
       roleSteps.forEach((step, stepIndex) => {
-        const blockX = x + (LANE_WIDTH - BLOCK_WIDTH) / 2;
-        const blockY = ROLE_HEADER_HEIGHT + 100 + stepIndex * (BLOCK_HEIGHT + BLOCK_MARGIN_Y * 2);
+        const blockX = laneX + (LANE_WIDTH - BLOCK_WIDTH) / 2;
+        const blockY = ROLE_HEADER_HEIGHT + BLOCK_MARGIN_Y + stepIndex * (BLOCK_HEIGHT + BLOCK_MARGIN_Y);
 
         stepPositions[step.id] = {
           x: blockX,
           y: blockY,
           width: BLOCK_WIDTH,
           height: BLOCK_HEIGHT,
-          roleIndex: roleIndex
+          roleIndex: roleIndex,
+          centerX: blockX + BLOCK_WIDTH / 2,
+          centerY: blockY + BLOCK_HEIGHT / 2
         };
 
         const isHovered = hoveredStepId === step.id;
         const isSelected = selectedStep?.id === step.id;
         const highlighted = isHovered || isSelected;
 
+        // Рисуем блок в зависимости от типа
         switch (step.type) {
           case "Start":
-            drawStartBlock(ctx, blockX, blockY, step.name, step.description, step.parameters, highlighted);
+            drawStartBlock(ctx, blockX, blockY, step, highlighted);
             break;
           case "Action":
-            drawActionBlock(ctx, blockX, blockY, step.name, step.description, step.parameters, highlighted);
+            drawActionBlock(ctx, blockX, blockY, step, highlighted);
             break;
           case "Product":
-            drawProductBlock(ctx, blockX, blockY, step.name, step.description, step.parameters, highlighted);
+            drawProductBlock(ctx, blockX, blockY, step, highlighted);
             break;
           case "Decision":
-            drawDecisionBlock(ctx, blockX, blockY, step.name, step.description, highlighted);
+            drawDecisionBlock(ctx, blockX, blockY, step, highlighted);
             break;
           case "Split":
-            drawSplitBlock(ctx, blockX + BLOCK_WIDTH / 2 - 80, blockY, highlighted);
+            drawSplitBlock(ctx, blockX, blockY, highlighted);
             break;
           case "End":
-            drawEndBlock(ctx, blockX, blockY, step.name, step.description, step.parameters, highlighted);
+            drawEndBlock(ctx, blockX, blockY, step, highlighted);
             break;
           default:
-            drawActionBlock(ctx, blockX, blockY, step.name, step.description, step.parameters, highlighted);
+            drawActionBlock(ctx, blockX, blockY, step, highlighted);
         }
         
+        // Иконка редактирования при наведении
         if (editable && isHovered) {
           ctx.fillStyle = "#6366F1";
           ctx.beginPath();
-          ctx.arc(blockX + BLOCK_WIDTH - 40, blockY + 40, 30, 0, Math.PI * 2);
+          ctx.arc(blockX + BLOCK_WIDTH - 15, blockY + 15, 12, 0, Math.PI * 2);
           ctx.fill();
           
           ctx.fillStyle = "#ffffff";
-          ctx.font = "bold 28px Arial, sans-serif";
+          ctx.font = "bold 12px Arial, sans-serif";
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
-          ctx.fillText("✎", blockX + BLOCK_WIDTH - 40, blockY + 40);
+          ctx.fillText("✎", blockX + BLOCK_WIDTH - 15, blockY + 15);
         }
       });
     });
 
     stepPositionsRef.current = stepPositions;
 
+    // ИСПРАВЛЕННАЯ отрисовка связей - обход блоков
     ctx.strokeStyle = "#333";
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 2;
     ctx.setLineDash([]);
 
     steps.forEach(step => {
@@ -335,128 +364,78 @@ export default function ProcessDiagramSwimlane({
         step.branches.forEach((branch) => {
           const toPos = stepPositions[branch.targetStepId];
           if (!toPos) return;
-          drawConnection(ctx, fromPos, toPos, branch.condition);
+          drawSmartConnection(ctx, fromPos, toPos, stepPositions, branch.condition);
         });
       } else if (step.nextSteps && step.nextSteps.length > 0) {
         step.nextSteps.forEach(nextStepId => {
           const toPos = stepPositions[nextStepId];
           if (!toPos) return;
-          drawConnection(ctx, fromPos, toPos);
+          drawSmartConnection(ctx, fromPos, toPos, stepPositions);
         });
       }
     });
 
     // Функция отрисовки параметров внутри блока
-    function drawParameters(
+    function drawBlockInfo(
       ctx: CanvasRenderingContext2D, 
-      parameters: ActionParameter[] | undefined, 
+      step: Step, 
       x: number, 
       startY: number, 
       maxWidth: number,
-      textColor: string,
-      maxHeight: number,
-      indent: number = 50
-    ): number {
-      if (!parameters || parameters.length === 0) return startY;
-      
+      textColor: string
+    ): void {
+      const params = step.parameters || [];
       let currentY = startY;
-      const endY = startY + maxHeight;
       
-      // Группируем параметры по типу - ограничиваем количество
-      const timeParams = parameters.filter(p => p.type === "time").slice(0, 1);
-      const docParams = parameters.filter(p => p.type === "document").slice(0, 2);
-      const dbParams = parameters.filter(p => p.type === "database").slice(0, 2);
-      const stageParams = parameters.filter(p => p.type === "stage").slice(0, 1);
-      
-      const leftX = x + indent;
-      const valueMaxWidth = maxWidth - indent * 2;
-      
-      // Время
-      if (timeParams.length > 0 && currentY < endY - 40) {
+      // Время выполнения
+      const timeParam = params.find(p => p.type === "time");
+      if (timeParam) {
         ctx.fillStyle = "#D84315";
-        ctx.font = "bold 22px Arial, sans-serif";
+        ctx.font = "11px Arial, sans-serif";
         ctx.textAlign = "left";
-        ctx.fillText("⏱ Время:", leftX, currentY);
-        currentY += 32;
-        
-        ctx.font = "20px Arial, sans-serif";
-        ctx.fillStyle = textColor;
-        timeParams.forEach(param => {
-          if (currentY < endY - 30) {
-            const truncated = truncateText(ctx, param.value, valueMaxWidth);
-            ctx.fillText(`   ${truncated}`, leftX, currentY);
-            currentY += 30;
-          }
-        });
-        currentY += 15;
+        const timeText = `⏱ ${timeParam.value}`;
+        ctx.fillText(truncateText(ctx, timeText, maxWidth), x, currentY);
+        currentY += 14;
       }
       
-      // Документы
-      if (docParams.length > 0 && currentY < endY - 40) {
-        ctx.fillStyle = "#1565C0";
-        ctx.font = "bold 22px Arial, sans-serif";
-        ctx.fillText("📄 Документы:", leftX, currentY);
-        currentY += 32;
-        
-        ctx.font = "20px Arial, sans-serif";
-        ctx.fillStyle = textColor;
-        docParams.forEach(param => {
-          if (currentY < endY - 30) {
-            const truncated = truncateText(ctx, param.value, valueMaxWidth);
-            ctx.fillText(`   ${truncated}`, leftX, currentY);
-            currentY += 30;
-          }
-        });
-        currentY += 15;
-      }
-      
-      // Системы/БД
-      if (dbParams.length > 0 && currentY < endY - 40) {
-        ctx.fillStyle = "#6A1B9A";
-        ctx.font = "bold 22px Arial, sans-serif";
-        ctx.fillText("🗄 Системы:", leftX, currentY);
-        currentY += 32;
-        
-        ctx.font = "20px Arial, sans-serif";
-        ctx.fillStyle = textColor;
-        dbParams.forEach(param => {
-          if (currentY < endY - 30) {
-            const truncated = truncateText(ctx, param.value, valueMaxWidth);
-            ctx.fillText(`   ${truncated}`, leftX, currentY);
-            currentY += 30;
-          }
-        });
-        currentY += 15;
-      }
-      
-      // Этап
-      if (stageParams.length > 0 && currentY < endY - 40) {
+      // Среда выполнения
+      const envParam = params.find(p => p.type === "environment");
+      if (envParam) {
         ctx.fillStyle = "#00695C";
-        ctx.font = "bold 22px Arial, sans-serif";
-        ctx.fillText("📍 Этап:", leftX, currentY);
-        currentY += 32;
-        
-        ctx.font = "20px Arial, sans-serif";
-        ctx.fillStyle = textColor;
-        stageParams.forEach(param => {
-          if (currentY < endY - 30) {
-            const truncated = truncateText(ctx, param.value, valueMaxWidth);
-            ctx.fillText(`   ${truncated}`, leftX, currentY);
-            currentY += 30;
-          }
-        });
+        ctx.font = "11px Arial, sans-serif";
+        const envText = `🖥 ${envParam.value}`;
+        ctx.fillText(truncateText(ctx, envText, maxWidth), x, currentY);
+        currentY += 14;
       }
       
-      return currentY;
+      // Документы (только первый)
+      const docParam = params.find(p => p.type === "document");
+      if (docParam) {
+        ctx.fillStyle = "#1565C0";
+        ctx.font = "11px Arial, sans-serif";
+        const docText = `📄 ${docParam.value}`;
+        ctx.fillText(truncateText(ctx, docText, maxWidth), x, currentY);
+        currentY += 14;
+      }
+      
+      // Системы (только первая)
+      const dbParam = params.find(p => p.type === "database");
+      if (dbParam) {
+        ctx.fillStyle = "#6A1B9A";
+        ctx.font = "11px Arial, sans-serif";
+        const dbText = `🗄 ${dbParam.value}`;
+        ctx.fillText(truncateText(ctx, dbText, maxWidth), x, currentY);
+      }
     }
 
-    function drawStartBlock(ctx: CanvasRenderingContext2D, x: number, y: number, text: string, description?: string, parameters?: ActionParameter[], highlighted: boolean = false) {
-      const radius = 60;
+    function drawStartBlock(ctx: CanvasRenderingContext2D, x: number, y: number, step: Step, highlighted: boolean = false) {
+      const radius = 20;
       
       ctx.fillStyle = highlighted ? "#A5D6A7" : "#C8E6C9";
       ctx.strokeStyle = highlighted ? "#2E7D32" : "#4CAF50";
-      ctx.lineWidth = highlighted ? 6 : 4;
+      ctx.lineWidth = highlighted ? 3 : 2;
       
+      // Овальная форма
       ctx.beginPath();
       ctx.moveTo(x + radius, y);
       ctx.lineTo(x + BLOCK_WIDTH - radius, y);
@@ -467,35 +446,25 @@ export default function ProcessDiagramSwimlane({
       ctx.fill();
       ctx.stroke();
       
-      // Заголовок - крупный шрифт
+      // Название
       ctx.fillStyle = "#1B5E20";
-      ctx.font = "bold 28px Arial, sans-serif";
+      ctx.font = "bold 13px Arial, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
-      wrapText(ctx, text, x + BLOCK_WIDTH / 2, y + 50, BLOCK_WIDTH - 180, 36, 2);
-      
-      // Описание
-      let descEndY = y + 140;
-      if (description) {
-        ctx.font = "22px Arial, sans-serif";
-        ctx.fillStyle = "#2E7D32";
-        descEndY = wrapText(ctx, description, x + BLOCK_WIDTH / 2, y + 140, BLOCK_WIDTH - 180, 30, 3);
-      }
+      wrapText(ctx, step.name, x + BLOCK_WIDTH / 2, y + 15, BLOCK_WIDTH - 50, 16, 2);
       
       // Параметры
-      if (parameters && parameters.length > 0) {
-        ctx.textAlign = "left";
-        drawParameters(ctx, parameters, x, descEndY + 25, BLOCK_WIDTH - 100, "#2E7D32", BLOCK_HEIGHT - descEndY + y - 60, 80);
-      }
+      drawBlockInfo(ctx, step, x + 25, y + 55, BLOCK_WIDTH - 50, "#2E7D32");
     }
 
-    function drawActionBlock(ctx: CanvasRenderingContext2D, x: number, y: number, text: string, description?: string, parameters?: ActionParameter[], highlighted: boolean = false) {
-      const indent = 70;
+    function drawActionBlock(ctx: CanvasRenderingContext2D, x: number, y: number, step: Step, highlighted: boolean = false) {
+      const indent = 25;
       
       ctx.fillStyle = highlighted ? "#BDBDBD" : "#E0E0E0";
       ctx.strokeStyle = highlighted ? "#212121" : "#424242";
-      ctx.lineWidth = highlighted ? 6 : 4;
+      ctx.lineWidth = highlighted ? 3 : 2;
       
+      // Шестиугольник
       ctx.beginPath();
       ctx.moveTo(x + indent, y);
       ctx.lineTo(x + BLOCK_WIDTH - indent, y);
@@ -507,35 +476,25 @@ export default function ProcessDiagramSwimlane({
       ctx.fill();
       ctx.stroke();
       
-      // Заголовок
+      // Название
       ctx.fillStyle = "#212121";
-      ctx.font = "bold 28px Arial, sans-serif";
+      ctx.font = "bold 12px Arial, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
-      wrapText(ctx, text, x + BLOCK_WIDTH / 2, y + 40, BLOCK_WIDTH - 200, 36, 2);
-      
-      // Описание
-      let descEndY = y + 130;
-      if (description) {
-        ctx.font = "20px Arial, sans-serif";
-        ctx.fillStyle = "#424242";
-        descEndY = wrapText(ctx, description, x + BLOCK_WIDTH / 2, y + 130, BLOCK_WIDTH - 200, 28, 3);
-      }
+      wrapText(ctx, step.name, x + BLOCK_WIDTH / 2, y + 12, BLOCK_WIDTH - 60, 14, 2);
       
       // Параметры
-      if (parameters && parameters.length > 0) {
-        ctx.textAlign = "left";
-        drawParameters(ctx, parameters, x + 60, descEndY + 25, BLOCK_WIDTH - 180, "#424242", BLOCK_HEIGHT - descEndY + y - 60, 60);
-      }
+      drawBlockInfo(ctx, step, x + 30, y + 50, BLOCK_WIDTH - 60, "#424242");
     }
 
-    function drawProductBlock(ctx: CanvasRenderingContext2D, x: number, y: number, text: string, description?: string, parameters?: ActionParameter[], highlighted: boolean = false) {
-      const radius = 30;
+    function drawProductBlock(ctx: CanvasRenderingContext2D, x: number, y: number, step: Step, highlighted: boolean = false) {
+      const radius = 10;
       
       ctx.fillStyle = "#ffffff";
       ctx.strokeStyle = highlighted ? "#1565C0" : "#1976D2";
-      ctx.lineWidth = highlighted ? 6 : 4;
+      ctx.lineWidth = highlighted ? 3 : 2;
       
+      // Прямоугольник со скруглёнными углами
       ctx.beginPath();
       ctx.moveTo(x + radius, y);
       ctx.lineTo(x + BLOCK_WIDTH - radius, y);
@@ -550,36 +509,28 @@ export default function ProcessDiagramSwimlane({
       ctx.fill();
       ctx.stroke();
       
-      // Заголовок
+      // Название
       ctx.fillStyle = "#0D47A1";
-      ctx.font = "bold 28px Arial, sans-serif";
+      ctx.font = "bold 12px Arial, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
-      wrapText(ctx, text, x + BLOCK_WIDTH / 2, y + 40, BLOCK_WIDTH - 120, 36, 2);
-      
-      // Описание
-      let descEndY = y + 130;
-      if (description) {
-        ctx.font = "20px Arial, sans-serif";
-        ctx.fillStyle = "#1565C0";
-        descEndY = wrapText(ctx, description, x + BLOCK_WIDTH / 2, y + 130, BLOCK_WIDTH - 120, 28, 3);
-      }
+      wrapText(ctx, step.name, x + BLOCK_WIDTH / 2, y + 12, BLOCK_WIDTH - 20, 14, 2);
       
       // Параметры
-      if (parameters && parameters.length > 0) {
-        ctx.textAlign = "left";
-        drawParameters(ctx, parameters, x, descEndY + 25, BLOCK_WIDTH - 60, "#1565C0", BLOCK_HEIGHT - descEndY + y - 60, 50);
-      }
+      drawBlockInfo(ctx, step, x + 10, y + 50, BLOCK_WIDTH - 20, "#1565C0");
     }
 
-    function drawDecisionBlock(ctx: CanvasRenderingContext2D, x: number, y: number, text: string, description?: string, highlighted: boolean = false) {
+    function drawDecisionBlock(ctx: CanvasRenderingContext2D, x: number, y: number, step: Step, highlighted: boolean = false) {
       const centerX = x + BLOCK_WIDTH / 2;
       const centerY = y + BLOCK_HEIGHT / 2;
+      const halfWidth = BLOCK_WIDTH / 2;
+      const halfHeight = BLOCK_HEIGHT / 2;
       
       ctx.fillStyle = highlighted ? "#FFF59D" : "#FFF9C4";
       ctx.strokeStyle = highlighted ? "#E65100" : "#FF9800";
-      ctx.lineWidth = highlighted ? 6 : 4;
+      ctx.lineWidth = highlighted ? 3 : 2;
       
+      // Ромб
       ctx.beginPath();
       ctx.moveTo(centerX, y);
       ctx.lineTo(x + BLOCK_WIDTH, centerY);
@@ -591,128 +542,137 @@ export default function ProcessDiagramSwimlane({
       
       // Знак вопроса
       ctx.fillStyle = "#E65100";
-      ctx.font = "bold 56px Arial, sans-serif";
+      ctx.font = "bold 20px Arial, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText("?", centerX, centerY - 80);
+      ctx.fillText("?", centerX, centerY - 20);
       
       // Текст вопроса
-      ctx.font = "bold 26px Arial, sans-serif";
+      ctx.font = "bold 11px Arial, sans-serif";
       ctx.fillStyle = "#BF360C";
-      wrapText(ctx, text, centerX, centerY - 10, BLOCK_WIDTH - 250, 34, 3);
-      
-      // Описание
-      if (description) {
-        ctx.font = "20px Arial, sans-serif";
-        ctx.fillStyle = "#E65100";
-        wrapText(ctx, description, centerX, centerY + 100, BLOCK_WIDTH - 250, 26, 2);
-      }
+      wrapText(ctx, step.name, centerX, centerY + 5, BLOCK_WIDTH - 60, 13, 2);
     }
 
     function drawSplitBlock(ctx: CanvasRenderingContext2D, x: number, y: number, highlighted: boolean = false) {
-      const width = 160;
+      const width = 60;
+      const centerX = x + BLOCK_WIDTH / 2;
       
       ctx.fillStyle = highlighted ? "#E1BEE7" : "#F3E5F5";
       ctx.strokeStyle = highlighted ? "#6A1B9A" : "#9C27B0";
-      ctx.lineWidth = highlighted ? 6 : 4;
+      ctx.lineWidth = highlighted ? 3 : 2;
       
+      // Треугольник
       ctx.beginPath();
-      ctx.moveTo(x + width / 2, y);
-      ctx.lineTo(x + width, y + BLOCK_HEIGHT);
-      ctx.lineTo(x, y + BLOCK_HEIGHT);
+      ctx.moveTo(centerX, y);
+      ctx.lineTo(centerX + width / 2, y + BLOCK_HEIGHT);
+      ctx.lineTo(centerX - width / 2, y + BLOCK_HEIGHT);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
-      
-      // Текст
-      ctx.fillStyle = "#6A1B9A";
-      ctx.font = "bold 26px Arial, sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText("Развилка", x + width / 2, y + BLOCK_HEIGHT / 2 + 60);
     }
 
-    function drawEndBlock(ctx: CanvasRenderingContext2D, x: number, y: number, text: string, description?: string, parameters?: ActionParameter[], highlighted: boolean = false) {
+    function drawEndBlock(ctx: CanvasRenderingContext2D, x: number, y: number, step: Step, highlighted: boolean = false) {
       ctx.fillStyle = highlighted ? "#FFCDD2" : "#FFEBEE";
       ctx.strokeStyle = highlighted ? "#B71C1C" : "#D32F2F";
-      ctx.lineWidth = highlighted ? 6 : 4;
+      ctx.lineWidth = highlighted ? 3 : 2;
       
-      ctx.strokeRect(x, y, BLOCK_WIDTH, BLOCK_HEIGHT);
+      // Двойная рамка
       ctx.fillRect(x, y, BLOCK_WIDTH, BLOCK_HEIGHT);
+      ctx.strokeRect(x, y, BLOCK_WIDTH, BLOCK_HEIGHT);
+      ctx.strokeRect(x + 5, y + 5, BLOCK_WIDTH - 10, BLOCK_HEIGHT - 10);
       
-      ctx.strokeRect(x + 20, y + 20, BLOCK_WIDTH - 40, BLOCK_HEIGHT - 40);
-      
-      // Заголовок
+      // Название
       ctx.fillStyle = "#B71C1C";
-      ctx.font = "bold 28px Arial, sans-serif";
+      ctx.font = "bold 12px Arial, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
-      wrapText(ctx, text, x + BLOCK_WIDTH / 2, y + 60, BLOCK_WIDTH - 120, 36, 2);
-      
-      // Описание
-      let descEndY = y + 150;
-      if (description) {
-        ctx.font = "20px Arial, sans-serif";
-        ctx.fillStyle = "#C62828";
-        descEndY = wrapText(ctx, description, x + BLOCK_WIDTH / 2, y + 150, BLOCK_WIDTH - 120, 28, 4);
-      }
+      wrapText(ctx, step.name, x + BLOCK_WIDTH / 2, y + 15, BLOCK_WIDTH - 30, 14, 2);
       
       // Параметры
-      if (parameters && parameters.length > 0) {
-        ctx.textAlign = "left";
-        drawParameters(ctx, parameters, x, descEndY + 25, BLOCK_WIDTH - 60, "#C62828", BLOCK_HEIGHT - descEndY + y - 60, 50);
-      }
+      drawBlockInfo(ctx, step, x + 15, y + 55, BLOCK_WIDTH - 30, "#C62828");
     }
 
-    function drawConnection(
+    // УМНАЯ маршрутизация связей - обход блоков
+    function drawSmartConnection(
       ctx: CanvasRenderingContext2D,
-      from: { x: number; y: number; width: number; height: number; roleIndex: number },
-      to: { x: number; y: number; width: number; height: number; roleIndex: number },
+      from: BlockPosition,
+      to: BlockPosition,
+      allPositions: Record<string, BlockPosition>,
       label?: string
     ) {
-      const fromCenterX = from.x + from.width / 2;
+      const fromCenterX = from.centerX;
       const fromBottomY = from.y + from.height;
-      const toCenterX = to.x + to.width / 2;
+      const toCenterX = to.centerX;
       const toTopY = to.y;
 
       ctx.strokeStyle = "#333";
-      ctx.lineWidth = 4;
+      ctx.lineWidth = 2;
       ctx.setLineDash([]);
 
-      if (from.roleIndex === to.roleIndex) {
+      // Определяем направление связи
+      const goingRight = to.roleIndex > from.roleIndex;
+      const goingLeft = to.roleIndex < from.roleIndex;
+      const sameColumn = from.roleIndex === to.roleIndex;
+      const goingUp = to.y < from.y;
+
+      if (sameColumn && !goingUp) {
+        // Простая вертикальная связь вниз в той же колонке
         ctx.beginPath();
         ctx.moveTo(fromCenterX, fromBottomY);
         ctx.lineTo(toCenterX, toTopY);
         ctx.stroke();
-        
         drawArrowHead(ctx, toCenterX, toTopY, Math.PI / 2);
+      } else if (sameColumn && goingUp) {
+        // Связь вверх в той же колонке - обходим слева
+        const offsetX = from.x - CONNECTION_OFFSET;
+        ctx.beginPath();
+        ctx.moveTo(from.x, from.centerY);
+        ctx.lineTo(offsetX, from.centerY);
+        ctx.lineTo(offsetX, to.centerY);
+        ctx.lineTo(to.x, to.centerY);
+        ctx.stroke();
+        drawArrowHead(ctx, to.x, to.centerY, 0);
       } else {
-        const midY = fromBottomY + (toTopY - fromBottomY) / 2;
+        // Связь между разными колонками
+        // Выходим из правого или левого края блока
+        const exitX = goingRight ? from.x + from.width : from.x;
+        const exitY = from.centerY;
+        
+        // Входим в левый или правый край целевого блока
+        const entryX = goingRight ? to.x : to.x + to.width;
+        const entryY = to.centerY;
+        
+        // Промежуточная точка для обхода
+        const midX = (exitX + entryX) / 2;
         
         ctx.beginPath();
-        ctx.moveTo(fromCenterX, fromBottomY);
-        ctx.lineTo(fromCenterX, midY);
-        ctx.lineTo(toCenterX, midY);
-        ctx.lineTo(toCenterX, toTopY);
+        ctx.moveTo(exitX, exitY);
+        ctx.lineTo(midX, exitY);
+        ctx.lineTo(midX, entryY);
+        ctx.lineTo(entryX, entryY);
         ctx.stroke();
         
-        drawArrowHead(ctx, toCenterX, toTopY, Math.PI / 2);
+        // Стрелка в направлении входа
+        const arrowAngle = goingRight ? 0 : Math.PI;
+        drawArrowHead(ctx, entryX, entryY, arrowAngle);
       }
 
+      // Метка на связи
       if (label) {
         const labelX = (fromCenterX + toCenterX) / 2;
-        const labelY = from.roleIndex === to.roleIndex 
+        const labelY = sameColumn 
           ? (fromBottomY + toTopY) / 2 
-          : fromBottomY + (toTopY - fromBottomY) / 2 - 25;
+          : from.centerY - 15;
         
         ctx.fillStyle = "#ffffff";
-        ctx.fillRect(labelX - 70, labelY - 22, 140, 44);
+        const labelWidth = ctx.measureText(label).width + 10;
+        ctx.fillRect(labelX - labelWidth / 2, labelY - 10, labelWidth, 20);
         ctx.strokeStyle = "#E65100";
-        ctx.lineWidth = 3;
-        ctx.strokeRect(labelX - 70, labelY - 22, 140, 44);
+        ctx.lineWidth = 1;
+        ctx.strokeRect(labelX - labelWidth / 2, labelY - 10, labelWidth, 20);
         
         ctx.fillStyle = "#E65100";
-        ctx.font = "bold 22px Arial, sans-serif";
+        ctx.font = "bold 11px Arial, sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(label, labelX, labelY);
@@ -720,7 +680,7 @@ export default function ProcessDiagramSwimlane({
     }
 
     function drawArrowHead(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number) {
-      const headLength = 25;
+      const headLength = 10;
       const headAngle = Math.PI / 6;
       
       ctx.fillStyle = "#333";
@@ -738,12 +698,12 @@ export default function ProcessDiagramSwimlane({
       ctx.fill();
     }
 
-  }, [roles, stages, steps, zoom, pan, wrapText, truncateText, hoveredStepId, selectedStep, editable]);
+  }, [roles, stages, steps, wrapText, truncateText, hoveredStepId, selectedStep, editable]);
 
   const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.1, 2));
   const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.1, 0.1));
-  const handleFitToScreen = () => { setZoom(0.25); setPan({ x: 0, y: 0 }); };
-  const handleResetView = () => { setZoom(0.28); setPan({ x: 0, y: 0 }); };
+  const handleFitToScreen = () => { setZoom(0.35); setPan({ x: 0, y: 0 }); };
+  const handleResetView = () => { setZoom(0.35); setPan({ x: 0, y: 0 }); };
 
   const handleExportPNG = () => {
     const canvas = canvasRef.current;
@@ -814,7 +774,7 @@ export default function ProcessDiagramSwimlane({
       <div
         ref={containerRef}
         className="relative overflow-hidden border rounded-lg bg-gray-50"
-        style={{ height: "900px", cursor: isDragging ? "grabbing" : "grab" }}
+        style={{ height: "700px", cursor: isDragging ? "grabbing" : "grab" }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -833,46 +793,42 @@ export default function ProcessDiagramSwimlane({
         />
       </div>
 
-      <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-        <h4 className="text-sm font-semibold mb-3">Легенда:</h4>
-        <div className="flex flex-wrap gap-6 text-sm">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-5 rounded-full bg-green-200 border-2 border-green-500"></div>
+      <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+        <h4 className="text-sm font-semibold mb-2">Легенда:</h4>
+        <div className="flex flex-wrap gap-4 text-xs">
+          <div className="flex items-center gap-1">
+            <div className="w-6 h-4 rounded-full bg-green-200 border-2 border-green-500"></div>
             <span>Начало/Конец</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-5 bg-gray-200 border-2 border-gray-500" style={{ clipPath: "polygon(15% 0%, 85% 0%, 100% 50%, 85% 100%, 15% 100%, 0% 50%)" }}></div>
+          <div className="flex items-center gap-1">
+            <div className="w-6 h-4 bg-gray-200 border-2 border-gray-500" style={{ clipPath: "polygon(15% 0%, 85% 0%, 100% 50%, 85% 100%, 15% 100%, 0% 50%)" }}></div>
             <span>Действие</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-5 bg-white border-2 border-blue-500 rounded"></div>
-            <span>Продукт/Результат</span>
+          <div className="flex items-center gap-1">
+            <div className="w-6 h-4 bg-white border-2 border-blue-500 rounded"></div>
+            <span>Продукт</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 bg-yellow-100 border-2 border-orange-500 rotate-45"></div>
+          <div className="flex items-center gap-1">
+            <div className="w-4 h-4 bg-yellow-100 border-2 border-orange-500 rotate-45"></div>
             <span className="ml-1">Решение</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-0 h-0 border-l-[10px] border-r-[10px] border-b-[15px] border-l-transparent border-r-transparent border-b-purple-300"></div>
-            <span>Развилка</span>
-          </div>
         </div>
-        <div className="mt-3 pt-3 border-t flex flex-wrap gap-6 text-sm">
-          <div className="flex items-center gap-2">
+        <div className="mt-2 pt-2 border-t flex flex-wrap gap-4 text-xs">
+          <div className="flex items-center gap-1">
             <span className="text-orange-600">⏱</span>
-            <span>Время выполнения</span>
+            <span>Время</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <span className="text-teal-600">🖥</span>
+            <span>Среда</span>
+          </div>
+          <div className="flex items-center gap-1">
             <span className="text-blue-600">📄</span>
             <span>Документы</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <span className="text-purple-600">🗄</span>
-            <span>Системы/БД</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-teal-600">📍</span>
-            <span>Этап процесса</span>
+            <span>Системы</span>
           </div>
         </div>
       </div>

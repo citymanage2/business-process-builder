@@ -27,6 +27,7 @@ const demoSteps = [
     order: 1,
     parameters: [
       { type: "time" as const, value: "15 минут" },
+      { type: "environment" as const, value: "CRM Битрикс24" },
       { type: "document" as const, value: "Форма заявки клиента" },
       { type: "database" as const, value: "CRM Битрикс24" },
     ],
@@ -42,6 +43,7 @@ const demoSteps = [
     order: 2,
     parameters: [
       { type: "time" as const, value: "30 минут" },
+      { type: "environment" as const, value: "CRM Битрикс24 + IP-телефония" },
       { type: "document" as const, value: "Скрипт первичного звонка" },
       { type: "document" as const, value: "Чек-лист квалификации" },
       { type: "database" as const, value: "CRM Битрикс24" },
@@ -81,6 +83,7 @@ const demoSteps = [
     order: 5,
     parameters: [
       { type: "time" as const, value: "1 час" },
+      { type: "environment" as const, value: "CRM Битрикс24" },
       { type: "document" as const, value: "Карточка клиента" },
       { type: "database" as const, value: "CRM Битрикс24" },
     ],
@@ -96,6 +99,7 @@ const demoSteps = [
     order: 6,
     parameters: [
       { type: "time" as const, value: "4 часа" },
+      { type: "environment" as const, value: "MS Excel + 1С:Управление проектами" },
       { type: "document" as const, value: "Шаблон КП" },
       { type: "document" as const, value: "Прайс-лист услуг" },
       { type: "document" as const, value: "Техническое задание" },
@@ -156,6 +160,7 @@ const demoSteps = [
     order: 10,
     parameters: [
       { type: "time" as const, value: "2 часа" },
+      { type: "environment" as const, value: "1С:Бухгалтерия + MS Word" },
       { type: "document" as const, value: "Шаблон договора" },
       { type: "document" as const, value: "Реквизиты клиента" },
       { type: "database" as const, value: "1С:Бухгалтерия" },

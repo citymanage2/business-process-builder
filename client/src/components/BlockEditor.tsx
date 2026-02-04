@@ -19,11 +19,11 @@ import {
   SheetFooter,
 } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
-import { X, Plus, Clock, FileText, Database, Layers, Trash2, Save, Link2 } from "lucide-react";
+import { X, Plus, Clock, FileText, Database, Layers, Trash2, Save, Link2, Monitor } from "lucide-react";
 import { toast } from "sonner";
 
 interface ActionParameter {
-  type: "time" | "document" | "database" | "stage";
+  type: "time" | "document" | "database" | "stage" | "environment";
   value: string;
 }
 
@@ -83,6 +83,7 @@ const PARAMETER_TYPES = [
   { value: "document", label: "Документ", icon: FileText },
   { value: "database", label: "База данных", icon: Database },
   { value: "stage", label: "Этап", icon: Layers },
+  { value: "environment", label: "Среда", icon: Monitor },
 ];
 
 export default function BlockEditor({
