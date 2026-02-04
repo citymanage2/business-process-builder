@@ -31,6 +31,9 @@ import {
   Dialog,
   DialogContent,
   DialogTrigger,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 
 export default function ProcessView() {
@@ -211,6 +214,12 @@ export default function ProcessView() {
                         </Button>
                       </DialogTrigger>
                       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                        <DialogHeader>
+                          <DialogTitle>Запросить изменения</DialogTitle>
+                          <DialogDescription>
+                            Опишите желаемые изменения в бизнес-процессе
+                          </DialogDescription>
+                        </DialogHeader>
                         <ChangeRequestPanel 
                           businessProcessId={processId} 
                           onClose={() => {
