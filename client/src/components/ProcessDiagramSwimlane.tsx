@@ -59,6 +59,7 @@ interface BlockPosition {
   roleIndex: number;
   centerX: number;
   centerY: number;
+  step: Step;
 }
 
 export default function ProcessDiagramSwimlane({ 
@@ -72,7 +73,7 @@ export default function ProcessDiagramSwimlane({
 }: ProcessDiagramSwimlaneProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [zoom, setZoom] = useState(0.35);
+  const [zoom, setZoom] = useState(0.25);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
@@ -83,14 +84,14 @@ export default function ProcessDiagramSwimlane({
   
   const stepPositionsRef = useRef<Record<string, BlockPosition>>({});
 
-  // Компактные размеры блоков для лучшего обзора
-  const ROLE_HEADER_HEIGHT = 80;
-  const LANE_WIDTH = 220;
-  const BLOCK_WIDTH = 180;
-  const BLOCK_HEIGHT = 120;
+  // УВЕЛИЧЕННЫЕ размеры блоков для подробного описания
+  const ROLE_HEADER_HEIGHT = 100;
+  const LANE_WIDTH = 420;
+  const BLOCK_WIDTH = 380;
+  const BLOCK_HEIGHT = 280;
   const BLOCK_MARGIN_X = 20;
-  const BLOCK_MARGIN_Y = 40;
-  const CONNECTION_OFFSET = 30; // Отступ для обхода блоков
+  const BLOCK_MARGIN_Y = 80;
+  const CONNECTION_GAP = 60; // Зазор между блоками для стрелок
 
   const ROLE_COLORS = [
     "#B3E5FC", "#F8BBD9", "#C8E6C9", "#FFF9C4", "#E1BEE7",
@@ -113,7 +114,7 @@ export default function ProcessDiagramSwimlane({
     return truncated + "...";
   }, []);
 
-  // Функция переноса текста
+  // Функция переноса текста с возвратом количества строк
   const wrapText = useCallback((
     ctx: CanvasRenderingContext2D,
     text: string,
@@ -121,7 +122,7 @@ export default function ProcessDiagramSwimlane({
     y: number,
     maxWidth: number,
     lineHeight: number,
-    maxLines: number = 2
+    maxLines: number = 3
   ): number => {
     const words = text.split(" ");
     let line = "";
@@ -149,18 +150,18 @@ export default function ProcessDiagramSwimlane({
     return currentY + lineHeight;
   }, [truncateText]);
 
-  // ИСПРАВЛЕННЫЙ расчёт координат мыши на canvas
+  // Расчёт координат мыши на canvas
   const getCanvasCoordinates = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     
     const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
     
-    // Координаты клика относительно canvas элемента
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
+    const clickX = (e.clientX - rect.left) * scaleX;
+    const clickY = (e.clientY - rect.top) * scaleY;
     
-    // Преобразуем в координаты canvas с учётом pan и zoom
     const canvasX = (clickX - pan.x) / zoom;
     const canvasY = (clickY - pan.y) / zoom;
     
@@ -172,7 +173,6 @@ export default function ProcessDiagramSwimlane({
     
     const { x: clickX, y: clickY } = getCanvasCoordinates(e);
     
-    // Проверяем попадание в блоки
     for (const [stepId, pos] of Object.entries(stepPositionsRef.current)) {
       if (clickX >= pos.x && clickX <= pos.x + pos.width &&
           clickY >= pos.y && clickY <= pos.y + pos.height) {
@@ -246,7 +246,7 @@ export default function ProcessDiagramSwimlane({
     });
 
     const canvasWidth = sortedRoles.length * LANE_WIDTH + 100;
-    const canvasHeight = ROLE_HEADER_HEIGHT + maxStepsInRole * (BLOCK_HEIGHT + BLOCK_MARGIN_Y) + 200;
+    const canvasHeight = ROLE_HEADER_HEIGHT + maxStepsInRole * (BLOCK_HEIGHT + BLOCK_MARGIN_Y) + 300;
 
     canvas.width = canvasWidth;
     canvas.height = canvasHeight;
@@ -282,11 +282,11 @@ export default function ProcessDiagramSwimlane({
       ctx.strokeRect(laneX, 0, LANE_WIDTH, ROLE_HEADER_HEIGHT);
 
       ctx.fillStyle = "#1a1a1a";
-      ctx.font = "bold 14px Arial, sans-serif";
+      ctx.font = "bold 18px Arial, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       
-      wrapText(ctx, role.name, laneX + LANE_WIDTH / 2, ROLE_HEADER_HEIGHT / 2, LANE_WIDTH - 20, 18, 2);
+      wrapText(ctx, role.name, laneX + LANE_WIDTH / 2, ROLE_HEADER_HEIGHT / 2, LANE_WIDTH - 30, 22, 2);
 
       // Рисуем блоки для этой роли
       const roleSteps = stepsByRole[role.id] || [];
@@ -302,7 +302,8 @@ export default function ProcessDiagramSwimlane({
           height: BLOCK_HEIGHT,
           roleIndex: roleIndex,
           centerX: blockX + BLOCK_WIDTH / 2,
-          centerY: blockY + BLOCK_HEIGHT / 2
+          centerY: blockY + BLOCK_HEIGHT / 2,
+          step: step
         };
 
         const isHovered = hoveredStepId === step.id;
@@ -329,53 +330,42 @@ export default function ProcessDiagramSwimlane({
           case "End":
             drawEndBlock(ctx, blockX, blockY, step, highlighted);
             break;
-          default:
-            drawActionBlock(ctx, blockX, blockY, step, highlighted);
-        }
-        
-        // Иконка редактирования при наведении
-        if (editable && isHovered) {
-          ctx.fillStyle = "#6366F1";
-          ctx.beginPath();
-          ctx.arc(blockX + BLOCK_WIDTH - 15, blockY + 15, 12, 0, Math.PI * 2);
-          ctx.fill();
-          
-          ctx.fillStyle = "#ffffff";
-          ctx.font = "bold 12px Arial, sans-serif";
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillText("✎", blockX + BLOCK_WIDTH - 15, blockY + 15);
         }
       });
     });
 
     stepPositionsRef.current = stepPositions;
 
-    // ИСПРАВЛЕННАЯ отрисовка связей - обход блоков
-    ctx.strokeStyle = "#333";
-    ctx.lineWidth = 2;
-    ctx.setLineDash([]);
-
+    // Рисуем связи ПОСЛЕ всех блоков (поверх)
     steps.forEach(step => {
       const fromPos = stepPositions[step.id];
       if (!fromPos) return;
 
-      if (step.branches && step.branches.length > 0) {
-        step.branches.forEach((branch) => {
-          const toPos = stepPositions[branch.targetStepId];
-          if (!toPos) return;
-          drawSmartConnection(ctx, fromPos, toPos, stepPositions, branch.condition);
-        });
-      } else if (step.nextSteps && step.nextSteps.length > 0) {
+      // Обычные связи nextSteps
+      if (step.nextSteps) {
         step.nextSteps.forEach(nextStepId => {
           const toPos = stepPositions[nextStepId];
-          if (!toPos) return;
-          drawSmartConnection(ctx, fromPos, toPos, stepPositions);
+          if (toPos) {
+            drawSmartConnection(ctx, fromPos, toPos, stepPositions);
+          }
+        });
+      }
+
+      // Связи из веток решений
+      if (step.branches) {
+        step.branches.forEach(branch => {
+          const toPos = stepPositions[branch.targetStepId];
+          if (toPos) {
+            drawSmartConnection(ctx, fromPos, toPos, stepPositions, branch.condition);
+          }
         });
       }
     });
 
-    // Функция отрисовки параметров внутри блока
+    // Рисуем легенду
+    drawLegend(ctx, 20, canvasHeight - 100);
+
+    // Функции рисования блоков с ПОДРОБНЫМ описанием
     function drawBlockInfo(
       ctx: CanvasRenderingContext2D, 
       step: Step, 
@@ -383,116 +373,141 @@ export default function ProcessDiagramSwimlane({
       startY: number, 
       maxWidth: number,
       textColor: string
-    ): void {
-      const params = step.parameters || [];
+    ) {
       let currentY = startY;
+      const lineHeight = 18;
+      const iconSize = 14;
       
-      // Время выполнения
-      const timeParam = params.find(p => p.type === "time");
-      if (timeParam) {
-        ctx.fillStyle = "#D84315";
-        ctx.font = "11px Arial, sans-serif";
-        ctx.textAlign = "left";
-        const timeText = `⏱ ${timeParam.value}`;
-        ctx.fillText(truncateText(ctx, timeText, maxWidth), x, currentY);
-        currentY += 14;
+      ctx.font = "13px Arial, sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.fillStyle = textColor;
+
+      // Описание действия (ПОДРОБНОЕ)
+      if (step.description) {
+        ctx.font = "italic 13px Arial, sans-serif";
+        ctx.fillStyle = "#555";
+        currentY = wrapText(ctx, step.description, x, currentY, maxWidth, lineHeight, 4);
+        currentY += 8;
       }
-      
-      // Среда выполнения
-      const envParam = params.find(p => p.type === "environment");
-      if (envParam) {
-        ctx.fillStyle = "#00695C";
-        ctx.font = "11px Arial, sans-serif";
-        const envText = `🖥 ${envParam.value}`;
-        ctx.fillText(truncateText(ctx, envText, maxWidth), x, currentY);
-        currentY += 14;
+
+      ctx.font = "13px Arial, sans-serif";
+      ctx.fillStyle = textColor;
+
+      // Параметры с иконками
+      if (step.parameters && step.parameters.length > 0) {
+        // Время
+        const timeParams = step.parameters.filter(p => p.type === "time");
+        if (timeParams.length > 0) {
+          ctx.fillText(`⏱ Время: ${timeParams.map(p => p.value).join(", ")}`, x, currentY);
+          currentY += lineHeight;
+        }
+
+        // Среда выполнения
+        const envParams = step.parameters.filter(p => p.type === "environment");
+        if (envParams.length > 0) {
+          ctx.fillText(`🖥 Среда: ${envParams.map(p => p.value).join(", ")}`, x, currentY);
+          currentY += lineHeight;
+        }
+
+        // Документы
+        const docParams = step.parameters.filter(p => p.type === "document");
+        if (docParams.length > 0) {
+          ctx.fillText(`📄 Документы:`, x, currentY);
+          currentY += lineHeight;
+          docParams.forEach(doc => {
+            const docText = truncateText(ctx, `   • ${doc.value}`, maxWidth);
+            ctx.fillText(docText, x, currentY);
+            currentY += lineHeight;
+          });
+        }
+
+        // Системы/БД
+        const dbParams = step.parameters.filter(p => p.type === "database");
+        if (dbParams.length > 0) {
+          ctx.fillText(`🗄 Системы: ${dbParams.map(p => p.value).join(", ")}`, x, currentY);
+          currentY += lineHeight;
+        }
+
+        // Этап
+        const stageParams = step.parameters.filter(p => p.type === "stage");
+        if (stageParams.length > 0) {
+          ctx.fillText(`📍 ${stageParams[0].value}`, x, currentY);
+          currentY += lineHeight;
+        }
       }
-      
-      // Документы (только первый)
-      const docParam = params.find(p => p.type === "document");
-      if (docParam) {
-        ctx.fillStyle = "#1565C0";
-        ctx.font = "11px Arial, sans-serif";
-        const docText = `📄 ${docParam.value}`;
-        ctx.fillText(truncateText(ctx, docText, maxWidth), x, currentY);
-        currentY += 14;
-      }
-      
-      // Системы (только первая)
-      const dbParam = params.find(p => p.type === "database");
-      if (dbParam) {
-        ctx.fillStyle = "#6A1B9A";
-        ctx.font = "11px Arial, sans-serif";
-        const dbText = `🗄 ${dbParam.value}`;
-        ctx.fillText(truncateText(ctx, dbText, maxWidth), x, currentY);
-      }
+
+      return currentY;
     }
 
     function drawStartBlock(ctx: CanvasRenderingContext2D, x: number, y: number, step: Step, highlighted: boolean = false) {
       const radius = 20;
       
       ctx.fillStyle = highlighted ? "#A5D6A7" : "#C8E6C9";
-      ctx.strokeStyle = highlighted ? "#2E7D32" : "#4CAF50";
-      ctx.lineWidth = highlighted ? 3 : 2;
+      ctx.strokeStyle = highlighted ? "#1B5E20" : "#4CAF50";
+      ctx.lineWidth = highlighted ? 4 : 3;
       
-      // Овальная форма
+      // Прямоугольник со скруглёнными углами
       ctx.beginPath();
       ctx.moveTo(x + radius, y);
       ctx.lineTo(x + BLOCK_WIDTH - radius, y);
-      ctx.arc(x + BLOCK_WIDTH - radius, y + BLOCK_HEIGHT / 2, BLOCK_HEIGHT / 2, -Math.PI / 2, Math.PI / 2);
+      ctx.quadraticCurveTo(x + BLOCK_WIDTH, y, x + BLOCK_WIDTH, y + radius);
+      ctx.lineTo(x + BLOCK_WIDTH, y + BLOCK_HEIGHT - radius);
+      ctx.quadraticCurveTo(x + BLOCK_WIDTH, y + BLOCK_HEIGHT, x + BLOCK_WIDTH - radius, y + BLOCK_HEIGHT);
       ctx.lineTo(x + radius, y + BLOCK_HEIGHT);
-      ctx.arc(x + radius, y + BLOCK_HEIGHT / 2, BLOCK_HEIGHT / 2, Math.PI / 2, -Math.PI / 2);
+      ctx.quadraticCurveTo(x, y + BLOCK_HEIGHT, x, y + BLOCK_HEIGHT - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
       
-      // Название
+      // Название (крупный шрифт)
       ctx.fillStyle = "#1B5E20";
-      ctx.font = "bold 13px Arial, sans-serif";
+      ctx.font = "bold 18px Arial, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
-      wrapText(ctx, step.name, x + BLOCK_WIDTH / 2, y + 15, BLOCK_WIDTH - 50, 16, 2);
+      wrapText(ctx, step.name, x + BLOCK_WIDTH / 2, y + 15, BLOCK_WIDTH - 30, 22, 2);
       
-      // Параметры
-      drawBlockInfo(ctx, step, x + 25, y + 55, BLOCK_WIDTH - 50, "#2E7D32");
+      // Параметры и описание
+      drawBlockInfo(ctx, step, x + 15, y + 70, BLOCK_WIDTH - 30, "#2E7D32");
     }
 
     function drawActionBlock(ctx: CanvasRenderingContext2D, x: number, y: number, step: Step, highlighted: boolean = false) {
-      const indent = 25;
-      
-      ctx.fillStyle = highlighted ? "#BDBDBD" : "#E0E0E0";
-      ctx.strokeStyle = highlighted ? "#212121" : "#424242";
-      ctx.lineWidth = highlighted ? 3 : 2;
+      ctx.fillStyle = highlighted ? "#E0E0E0" : "#F5F5F5";
+      ctx.strokeStyle = highlighted ? "#424242" : "#757575";
+      ctx.lineWidth = highlighted ? 4 : 3;
       
       // Шестиугольник
+      const inset = 25;
       ctx.beginPath();
-      ctx.moveTo(x + indent, y);
-      ctx.lineTo(x + BLOCK_WIDTH - indent, y);
+      ctx.moveTo(x + inset, y);
+      ctx.lineTo(x + BLOCK_WIDTH - inset, y);
       ctx.lineTo(x + BLOCK_WIDTH, y + BLOCK_HEIGHT / 2);
-      ctx.lineTo(x + BLOCK_WIDTH - indent, y + BLOCK_HEIGHT);
-      ctx.lineTo(x + indent, y + BLOCK_HEIGHT);
+      ctx.lineTo(x + BLOCK_WIDTH - inset, y + BLOCK_HEIGHT);
+      ctx.lineTo(x + inset, y + BLOCK_HEIGHT);
       ctx.lineTo(x, y + BLOCK_HEIGHT / 2);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
       
-      // Название
+      // Название (крупный шрифт)
       ctx.fillStyle = "#212121";
-      ctx.font = "bold 12px Arial, sans-serif";
+      ctx.font = "bold 18px Arial, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
-      wrapText(ctx, step.name, x + BLOCK_WIDTH / 2, y + 12, BLOCK_WIDTH - 60, 14, 2);
+      wrapText(ctx, step.name, x + BLOCK_WIDTH / 2, y + 15, BLOCK_WIDTH - 60, 22, 2);
       
-      // Параметры
-      drawBlockInfo(ctx, step, x + 30, y + 50, BLOCK_WIDTH - 60, "#424242");
+      // Параметры и описание
+      drawBlockInfo(ctx, step, x + 35, y + 70, BLOCK_WIDTH - 70, "#424242");
     }
 
     function drawProductBlock(ctx: CanvasRenderingContext2D, x: number, y: number, step: Step, highlighted: boolean = false) {
       const radius = 10;
       
-      ctx.fillStyle = "#ffffff";
-      ctx.strokeStyle = highlighted ? "#1565C0" : "#1976D2";
-      ctx.lineWidth = highlighted ? 3 : 2;
+      ctx.fillStyle = highlighted ? "#90CAF9" : "#BBDEFB";
+      ctx.strokeStyle = highlighted ? "#0D47A1" : "#1976D2";
+      ctx.lineWidth = highlighted ? 4 : 3;
       
       // Прямоугольник со скруглёнными углами
       ctx.beginPath();
@@ -511,13 +526,13 @@ export default function ProcessDiagramSwimlane({
       
       // Название
       ctx.fillStyle = "#0D47A1";
-      ctx.font = "bold 12px Arial, sans-serif";
+      ctx.font = "bold 18px Arial, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
-      wrapText(ctx, step.name, x + BLOCK_WIDTH / 2, y + 12, BLOCK_WIDTH - 20, 14, 2);
+      wrapText(ctx, step.name, x + BLOCK_WIDTH / 2, y + 15, BLOCK_WIDTH - 30, 22, 2);
       
       // Параметры
-      drawBlockInfo(ctx, step, x + 10, y + 50, BLOCK_WIDTH - 20, "#1565C0");
+      drawBlockInfo(ctx, step, x + 15, y + 70, BLOCK_WIDTH - 30, "#1565C0");
     }
 
     function drawDecisionBlock(ctx: CanvasRenderingContext2D, x: number, y: number, step: Step, highlighted: boolean = false) {
@@ -528,7 +543,7 @@ export default function ProcessDiagramSwimlane({
       
       ctx.fillStyle = highlighted ? "#FFF59D" : "#FFF9C4";
       ctx.strokeStyle = highlighted ? "#E65100" : "#FF9800";
-      ctx.lineWidth = highlighted ? 3 : 2;
+      ctx.lineWidth = highlighted ? 4 : 3;
       
       // Ромб
       ctx.beginPath();
@@ -542,24 +557,24 @@ export default function ProcessDiagramSwimlane({
       
       // Знак вопроса
       ctx.fillStyle = "#E65100";
-      ctx.font = "bold 20px Arial, sans-serif";
+      ctx.font = "bold 28px Arial, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText("?", centerX, centerY - 20);
+      ctx.fillText("?", centerX, centerY - 40);
       
       // Текст вопроса
-      ctx.font = "bold 11px Arial, sans-serif";
+      ctx.font = "bold 16px Arial, sans-serif";
       ctx.fillStyle = "#BF360C";
-      wrapText(ctx, step.name, centerX, centerY + 5, BLOCK_WIDTH - 60, 13, 2);
+      wrapText(ctx, step.name, centerX, centerY - 10, BLOCK_WIDTH - 100, 20, 3);
     }
 
     function drawSplitBlock(ctx: CanvasRenderingContext2D, x: number, y: number, highlighted: boolean = false) {
-      const width = 60;
+      const width = 80;
       const centerX = x + BLOCK_WIDTH / 2;
       
       ctx.fillStyle = highlighted ? "#E1BEE7" : "#F3E5F5";
       ctx.strokeStyle = highlighted ? "#6A1B9A" : "#9C27B0";
-      ctx.lineWidth = highlighted ? 3 : 2;
+      ctx.lineWidth = highlighted ? 4 : 3;
       
       // Треугольник
       ctx.beginPath();
@@ -574,25 +589,25 @@ export default function ProcessDiagramSwimlane({
     function drawEndBlock(ctx: CanvasRenderingContext2D, x: number, y: number, step: Step, highlighted: boolean = false) {
       ctx.fillStyle = highlighted ? "#FFCDD2" : "#FFEBEE";
       ctx.strokeStyle = highlighted ? "#B71C1C" : "#D32F2F";
-      ctx.lineWidth = highlighted ? 3 : 2;
+      ctx.lineWidth = highlighted ? 4 : 3;
       
       // Двойная рамка
       ctx.fillRect(x, y, BLOCK_WIDTH, BLOCK_HEIGHT);
       ctx.strokeRect(x, y, BLOCK_WIDTH, BLOCK_HEIGHT);
-      ctx.strokeRect(x + 5, y + 5, BLOCK_WIDTH - 10, BLOCK_HEIGHT - 10);
+      ctx.strokeRect(x + 8, y + 8, BLOCK_WIDTH - 16, BLOCK_HEIGHT - 16);
       
       // Название
       ctx.fillStyle = "#B71C1C";
-      ctx.font = "bold 12px Arial, sans-serif";
+      ctx.font = "bold 18px Arial, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
-      wrapText(ctx, step.name, x + BLOCK_WIDTH / 2, y + 15, BLOCK_WIDTH - 30, 14, 2);
+      wrapText(ctx, step.name, x + BLOCK_WIDTH / 2, y + 20, BLOCK_WIDTH - 40, 22, 2);
       
       // Параметры
-      drawBlockInfo(ctx, step, x + 15, y + 55, BLOCK_WIDTH - 30, "#C62828");
+      drawBlockInfo(ctx, step, x + 20, y + 80, BLOCK_WIDTH - 40, "#C62828");
     }
 
-    // УМНАЯ маршрутизация связей - обход блоков
+    // ПОЛНЫЙ ОБХОД БЛОКОВ - стрелки НИКОГДА не проходят через блоки
     function drawSmartConnection(
       ctx: CanvasRenderingContext2D,
       from: BlockPosition,
@@ -600,87 +615,230 @@ export default function ProcessDiagramSwimlane({
       allPositions: Record<string, BlockPosition>,
       label?: string
     ) {
-      const fromCenterX = from.centerX;
-      const fromBottomY = from.y + from.height;
-      const toCenterX = to.centerX;
-      const toTopY = to.y;
-
       ctx.strokeStyle = "#333";
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 3;
       ctx.setLineDash([]);
 
-      // Определяем направление связи
-      const goingRight = to.roleIndex > from.roleIndex;
-      const goingLeft = to.roleIndex < from.roleIndex;
       const sameColumn = from.roleIndex === to.roleIndex;
-      const goingUp = to.y < from.y;
-
-      if (sameColumn && !goingUp) {
-        // Простая вертикальная связь вниз в той же колонке
-        ctx.beginPath();
-        ctx.moveTo(fromCenterX, fromBottomY);
-        ctx.lineTo(toCenterX, toTopY);
-        ctx.stroke();
-        drawArrowHead(ctx, toCenterX, toTopY, Math.PI / 2);
-      } else if (sameColumn && goingUp) {
-        // Связь вверх в той же колонке - обходим слева
-        const offsetX = from.x - CONNECTION_OFFSET;
-        ctx.beginPath();
-        ctx.moveTo(from.x, from.centerY);
-        ctx.lineTo(offsetX, from.centerY);
-        ctx.lineTo(offsetX, to.centerY);
-        ctx.lineTo(to.x, to.centerY);
-        ctx.stroke();
-        drawArrowHead(ctx, to.x, to.centerY, 0);
-      } else {
-        // Связь между разными колонками
-        // Выходим из правого или левого края блока
-        const exitX = goingRight ? from.x + from.width : from.x;
-        const exitY = from.centerY;
+      const goingDown = to.y > from.y;
+      const goingRight = to.roleIndex > from.roleIndex;
+      
+      // Находим все блоки между исходным и целевым
+      const allBlocks = Object.values(allPositions);
+      
+      // Функция проверки пересечения линии с блоком
+      function lineIntersectsBlock(x1: number, y1: number, x2: number, y2: number, block: BlockPosition): boolean {
+        if (block.step.id === from.step.id || block.step.id === to.step.id) return false;
         
-        // Входим в левый или правый край целевого блока
-        const entryX = goingRight ? to.x : to.x + to.width;
-        const entryY = to.centerY;
+        const padding = 10;
+        const bx1 = block.x - padding;
+        const by1 = block.y - padding;
+        const bx2 = block.x + block.width + padding;
+        const by2 = block.y + block.height + padding;
         
-        // Промежуточная точка для обхода
-        const midX = (exitX + entryX) / 2;
+        // Проверяем пересечение отрезка с прямоугольником
+        // Горизонтальная линия
+        if (y1 === y2) {
+          const minX = Math.min(x1, x2);
+          const maxX = Math.max(x1, x2);
+          return y1 >= by1 && y1 <= by2 && maxX >= bx1 && minX <= bx2;
+        }
+        // Вертикальная линия
+        if (x1 === x2) {
+          const minY = Math.min(y1, y2);
+          const maxY = Math.max(y1, y2);
+          return x1 >= bx1 && x1 <= bx2 && maxY >= by1 && minY <= by2;
+        }
+        return false;
+      }
+      
+      // Находим безопасную Y-координату для горизонтального сегмента
+      function findSafeHorizontalY(startX: number, endX: number, preferredY: number, direction: 'up' | 'down'): number {
+        let safeY = preferredY;
+        const step = direction === 'up' ? -20 : 20;
+        let attempts = 0;
+        const maxAttempts = 50;
         
-        ctx.beginPath();
-        ctx.moveTo(exitX, exitY);
-        ctx.lineTo(midX, exitY);
-        ctx.lineTo(midX, entryY);
-        ctx.lineTo(entryX, entryY);
-        ctx.stroke();
+        while (attempts < maxAttempts) {
+          let isSafe = true;
+          for (const block of allBlocks) {
+            if (block.step.id === from.step.id || block.step.id === to.step.id) continue;
+            if (lineIntersectsBlock(startX, safeY, endX, safeY, block)) {
+              isSafe = false;
+              break;
+            }
+          }
+          if (isSafe) return safeY;
+          safeY += step;
+          attempts++;
+        }
+        return preferredY;
+      }
+      
+      // Находим безопасную X-координату для вертикального сегмента
+      function findSafeVerticalX(startY: number, endY: number, preferredX: number, direction: 'left' | 'right'): number {
+        let safeX = preferredX;
+        const step = direction === 'left' ? -20 : 20;
+        let attempts = 0;
+        const maxAttempts = 50;
         
-        // Стрелка в направлении входа
-        const arrowAngle = goingRight ? 0 : Math.PI;
-        drawArrowHead(ctx, entryX, entryY, arrowAngle);
+        while (attempts < maxAttempts) {
+          let isSafe = true;
+          for (const block of allBlocks) {
+            if (block.step.id === from.step.id || block.step.id === to.step.id) continue;
+            if (lineIntersectsBlock(safeX, startY, safeX, endY, block)) {
+              isSafe = false;
+              break;
+            }
+          }
+          if (isSafe) return safeX;
+          safeX += step;
+          attempts++;
+        }
+        return preferredX;
       }
 
-      // Метка на связи
-      if (label) {
-        const labelX = (fromCenterX + toCenterX) / 2;
-        const labelY = sameColumn 
-          ? (fromBottomY + toTopY) / 2 
-          : from.centerY - 15;
+      if (sameColumn) {
+        if (goingDown) {
+          // Вниз в той же колонке - простая вертикальная линия
+          const startX = from.centerX;
+          const startY = from.y + from.height;
+          const endX = to.centerX;
+          const endY = to.y;
+          
+          // Проверяем, есть ли блоки между
+          let hasBlockBetween = false;
+          for (const block of allBlocks) {
+            if (block.step.id === from.step.id || block.step.id === to.step.id) continue;
+            if (block.roleIndex === from.roleIndex && 
+                block.y > from.y + from.height && 
+                block.y + block.height < to.y) {
+              hasBlockBetween = true;
+              break;
+            }
+          }
+          
+          if (!hasBlockBetween) {
+            // Прямая линия
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+            drawArrowHead(ctx, endX, endY, Math.PI / 2);
+          } else {
+            // Обходим слева
+            const offsetX = from.x - CONNECTION_GAP;
+            const safeX = findSafeVerticalX(startY, endY, offsetX, 'left');
+            
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(startX, startY + 20);
+            ctx.lineTo(safeX, startY + 20);
+            ctx.lineTo(safeX, endY - 20);
+            ctx.lineTo(endX, endY - 20);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+            drawArrowHead(ctx, endX, endY, Math.PI / 2);
+          }
+        } else {
+          // Вверх в той же колонке - обходим СЛЕВА
+          const offsetX = from.x - CONNECTION_GAP;
+          const safeX = findSafeVerticalX(to.centerY, from.centerY, offsetX, 'left');
+          
+          ctx.beginPath();
+          ctx.moveTo(from.x, from.centerY);
+          ctx.lineTo(safeX, from.centerY);
+          ctx.lineTo(safeX, to.centerY);
+          ctx.lineTo(to.x, to.centerY);
+          ctx.stroke();
+          drawArrowHead(ctx, to.x, to.centerY, Math.PI);
+        }
         
-        ctx.fillStyle = "#ffffff";
-        const labelWidth = ctx.measureText(label).width + 10;
-        ctx.fillRect(labelX - labelWidth / 2, labelY - 10, labelWidth, 20);
-        ctx.strokeStyle = "#E65100";
-        ctx.lineWidth = 1;
-        ctx.strokeRect(labelX - labelWidth / 2, labelY - 10, labelWidth, 20);
+        if (label) {
+          const labelX = from.x - CONNECTION_GAP - 30;
+          const labelY = (from.centerY + to.centerY) / 2;
+          drawConnectionLabel(ctx, labelX, labelY, label);
+        }
+      } else {
+        // Связь между разными колонками
+        // Всегда выходим снизу/сверху и обходим все блоки
         
-        ctx.fillStyle = "#E65100";
-        ctx.font = "bold 11px Arial, sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(label, labelX, labelY);
+        // Находим все блоки между колонками
+        const minRoleIndex = Math.min(from.roleIndex, to.roleIndex);
+        const maxRoleIndex = Math.max(from.roleIndex, to.roleIndex);
+        
+        const blocksBetween = allBlocks.filter(b => 
+          b.roleIndex >= minRoleIndex && 
+          b.roleIndex <= maxRoleIndex &&
+          b.step.id !== from.step.id &&
+          b.step.id !== to.step.id
+        );
+        
+        // Находим безопасную Y-координату для горизонтального сегмента
+        // Предпочитаем идти сверху или снизу всех блоков
+        let minY = ROLE_HEADER_HEIGHT;
+        let maxY = ROLE_HEADER_HEIGHT;
+        
+        blocksBetween.forEach(b => {
+          minY = Math.min(minY, b.y);
+          maxY = Math.max(maxY, b.y + b.height);
+        });
+        minY = Math.min(minY, from.y, to.y);
+        maxY = Math.max(maxY, from.y + from.height, to.y + to.height);
+        
+        // Выбираем путь: сверху или снизу
+        const topRoute = minY - CONNECTION_GAP;
+        const bottomRoute = maxY + CONNECTION_GAP;
+        
+        // Выбираем более короткий путь
+        const useTop = topRoute > ROLE_HEADER_HEIGHT + 20;
+        const routeY = useTop ? topRoute : bottomRoute;
+        
+        // Точки выхода и входа
+        const startX = from.centerX;
+        const startY = useTop ? from.y : from.y + from.height;
+        const endX = to.centerX;
+        const endY = useTop ? to.y : to.y + to.height;
+        
+        // Рисуем путь: вертикально → горизонтально → вертикально
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(startX, routeY);
+        ctx.lineTo(endX, routeY);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+        
+        // Стрелка
+        const arrowAngle = useTop ? -Math.PI / 2 : Math.PI / 2;
+        drawArrowHead(ctx, endX, endY, arrowAngle);
+        
+        // Метка
+        if (label) {
+          const labelX = (startX + endX) / 2;
+          const labelY = routeY + (useTop ? -15 : 15);
+          drawConnectionLabel(ctx, labelX, labelY, label);
+        }
       }
     }
 
+    function drawConnectionLabel(ctx: CanvasRenderingContext2D, x: number, y: number, label: string) {
+      ctx.font = "bold 14px Arial, sans-serif";
+      const labelWidth = ctx.measureText(label).width + 16;
+      
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(x - labelWidth / 2, y - 12, labelWidth, 24);
+      ctx.strokeStyle = "#E65100";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x - labelWidth / 2, y - 12, labelWidth, 24);
+      
+      ctx.fillStyle = "#E65100";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, x, y);
+    }
+
     function drawArrowHead(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number) {
-      const headLength = 10;
+      const headLength = 14;
       const headAngle = Math.PI / 6;
       
       ctx.fillStyle = "#333";
@@ -698,21 +856,49 @@ export default function ProcessDiagramSwimlane({
       ctx.fill();
     }
 
-  }, [roles, stages, steps, wrapText, truncateText, hoveredStepId, selectedStep, editable]);
+    function drawLegend(ctx: CanvasRenderingContext2D, x: number, y: number) {
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(x, y, 700, 80);
+      ctx.strokeStyle = "#ccc";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x, y, 700, 80);
 
-  const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.1, 2));
-  const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.1, 0.1));
-  const handleFitToScreen = () => { setZoom(0.35); setPan({ x: 0, y: 0 }); };
-  const handleResetView = () => { setZoom(0.35); setPan({ x: 0, y: 0 }); };
+      ctx.font = "bold 16px Arial, sans-serif";
+      ctx.fillStyle = "#333";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillText("Легенда:", x + 15, y + 20);
 
-  const handleExportPNG = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const link = document.createElement("a");
-    link.download = `${title.replace(/\s+/g, "_")}_diagram.png`;
-    link.href = canvas.toDataURL("image/png");
-    link.click();
+      const items = [
+        { icon: "🟢", label: "Начало/Конец" },
+        { icon: "⬡", label: "Действие" },
+        { icon: "🔷", label: "Продукт" },
+        { icon: "◇", label: "Решение" },
+      ];
+
+      ctx.font = "14px Arial, sans-serif";
+      let itemX = x + 15;
+      items.forEach(item => {
+        ctx.fillText(`${item.icon} ${item.label}`, itemX, y + 50);
+        itemX += 140;
+      });
+
+      // Вторая строка - параметры
+      ctx.fillText("⏱ Время   🖥 Среда   📄 Документы   🗄 Системы", x + 15, y + 70);
+    }
+
+  }, [roles, stages, steps, zoom, pan, hoveredStepId, selectedStep, wrapText, truncateText]);
+
+  // Обработчики масштабирования и перемещения
+  const handleZoomIn = () => setZoom(z => Math.min(z * 1.2, 2));
+  const handleZoomOut = () => setZoom(z => Math.max(z / 1.2, 0.1));
+  const handleFitToScreen = () => {
+    setZoom(0.25);
+    setPan({ x: 0, y: 0 });
+  };
+  const handleResetView = () => {
+    setZoom(0.25);
+    setPan({ x: 0, y: 0 });
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -726,17 +912,29 @@ export default function ProcessDiagramSwimlane({
     if (isDragging) {
       const dx = e.clientX - lastMousePos.x;
       const dy = e.clientY - lastMousePos.y;
-      setPan(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+      setPan(p => ({ x: p.x + dx, y: p.y + dy }));
       setLastMousePos({ x: e.clientX, y: e.clientY });
     }
   };
 
-  const handleMouseUp = () => setIsDragging(false);
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
 
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.05 : 0.05;
-    setZoom(prev => Math.max(0.1, Math.min(2, prev + delta)));
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    setZoom(z => Math.max(0.1, Math.min(2, z * delta)));
+  };
+
+  const handleExportPNG = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const link = document.createElement("a");
+    link.download = `${title || "diagram"}.png`;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
   };
 
   return (
@@ -744,37 +942,31 @@ export default function ProcessDiagramSwimlane({
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold">{title}</h3>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleZoomOut} title="Уменьшить">
+          <Button variant="outline" size="icon" onClick={handleZoomOut} title="Уменьшить">
             <ZoomOut className="h-4 w-4" />
           </Button>
-          <span className="text-sm text-muted-foreground min-w-[50px] text-center">
+          <span className="text-sm text-muted-foreground w-12 text-center">
             {Math.round(zoom * 100)}%
           </span>
-          <Button variant="outline" size="sm" onClick={handleZoomIn} title="Увеличить">
+          <Button variant="outline" size="icon" onClick={handleZoomIn} title="Увеличить">
             <ZoomIn className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="sm" onClick={handleFitToScreen} title="Вписать в экран">
+          <Button variant="outline" size="icon" onClick={handleFitToScreen} title="Вписать в экран">
             <Maximize2 className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="sm" onClick={handleResetView} title="Сбросить вид">
+          <Button variant="outline" size="icon" onClick={handleResetView} title="Сбросить вид">
             <RotateCcw className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="sm" onClick={handleExportPNG} title="Экспорт PNG">
+          <Button variant="outline" size="icon" onClick={handleExportPNG} title="Экспорт PNG">
             <Download className="h-4 w-4" />
           </Button>
-          {editable && (
-            <div className="flex items-center gap-1 ml-2 px-2 py-1 bg-primary/10 rounded text-sm">
-              <Edit3 className="h-3 w-3" />
-              <span>Режим редактирования</span>
-            </div>
-          )}
         </div>
       </div>
 
-      <div
+      <div 
         ref={containerRef}
         className="relative overflow-hidden border rounded-lg bg-gray-50"
-        style={{ height: "700px", cursor: isDragging ? "grabbing" : "grab" }}
+        style={{ height: "600px", cursor: isDragging ? "grabbing" : "grab" }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -787,65 +979,55 @@ export default function ProcessDiagramSwimlane({
           onMouseMove={handleCanvasMouseMove}
           style={{
             transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-            transformOrigin: "top left",
-            cursor: editable ? "pointer" : isDragging ? "grabbing" : "grab"
+            transformOrigin: "0 0",
+            cursor: editable && hoveredStepId ? "pointer" : undefined,
           }}
         />
       </div>
 
-      <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-        <h4 className="text-sm font-semibold mb-2">Легенда:</h4>
-        <div className="flex flex-wrap gap-4 text-xs">
-          <div className="flex items-center gap-1">
-            <div className="w-6 h-4 rounded-full bg-green-200 border-2 border-green-500"></div>
-            <span>Начало/Конец</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-6 h-4 bg-gray-200 border-2 border-gray-500" style={{ clipPath: "polygon(15% 0%, 85% 0%, 100% 50%, 85% 100%, 15% 100%, 0% 50%)" }}></div>
-            <span>Действие</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-6 h-4 bg-white border-2 border-blue-500 rounded"></div>
-            <span>Продукт</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-4 h-4 bg-yellow-100 border-2 border-orange-500 rotate-45"></div>
-            <span className="ml-1">Решение</span>
-          </div>
+      <div className="mt-4 flex flex-wrap gap-4 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2">
+          <span className="font-semibold">Легенда:</span>
         </div>
-        <div className="mt-2 pt-2 border-t flex flex-wrap gap-4 text-xs">
-          <div className="flex items-center gap-1">
-            <span className="text-orange-600">⏱</span>
-            <span>Время</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="text-teal-600">🖥</span>
-            <span>Среда</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="text-blue-600">📄</span>
-            <span>Документы</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="text-purple-600">🗄</span>
-            <span>Системы</span>
-          </div>
+        <div className="flex items-center gap-1">
+          <span className="w-4 h-4 rounded-full bg-green-200 border border-green-500"></span>
+          <span>Начало/Конец</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="w-4 h-4 bg-gray-200 border border-gray-500" style={{ clipPath: "polygon(20% 0%, 80% 0%, 100% 50%, 80% 100%, 20% 100%, 0% 50%)" }}></span>
+          <span>Действие</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="w-4 h-4 rounded bg-blue-200 border border-blue-500"></span>
+          <span>Продукт</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="w-4 h-4 bg-yellow-200 border border-orange-500" style={{ clipPath: "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)" }}></span>
+          <span>Решение</span>
+        </div>
+        <div className="flex items-center gap-2 ml-4">
+          <span>⏱ Время</span>
+          <span>🖥 Среда</span>
+          <span>📄 Документы</span>
+          <span>🗄 Системы</span>
         </div>
       </div>
 
-      <BlockEditor
-        step={selectedStep}
-        roles={roles}
-        stages={stages}
-        allSteps={steps}
-        isOpen={isEditorOpen}
-        onSave={handleStepSave}
-        onDelete={handleStepDelete}
-        onClose={() => {
-          setIsEditorOpen(false);
-          setSelectedStep(null);
-        }}
-      />
+      {selectedStep && (
+        <BlockEditor
+          step={selectedStep}
+          roles={roles}
+          stages={stages}
+          allSteps={steps}
+          isOpen={isEditorOpen}
+          onClose={() => {
+            setIsEditorOpen(false);
+            setSelectedStep(null);
+          }}
+          onSave={handleStepSave}
+          onDelete={handleStepDelete}
+        />
+      )}
     </Card>
   );
 }
