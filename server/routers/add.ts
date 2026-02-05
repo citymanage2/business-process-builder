@@ -40,18 +40,20 @@ router.post('/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // ✅ ИСПРАВЛЕНО: Создаем пользователя с правильными полями
-    const [user] = await db.insert(users).values({
+    const insertResult = await db.insert(users).values({
       email: email || null,
       phone: phone || null,
       passwordHash: hashedPassword, // ✅ ИСПРАВЛЕНО: было password
       name: name || null,
       provider: 'local', // ✅ ДОБАВЛЕНО: указываем провайдера
       role: 'user', // ✅ ДОБАВЛЕНО: роль по умолчанию
-    }).returning();
+    }).$returningId();
+    
+    const userId = insertResult[0].id;
 
     res.json({ 
       message: 'Регистрация успешна',
-      userId: user.id 
+      userId: userId 
     });
   } catch (error) {
     console.error('Register error:', error);

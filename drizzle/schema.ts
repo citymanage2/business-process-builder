@@ -1,4 +1,4 @@
-import { integer, pgEnum, pgTable, text, timestamp, varchar, serial } from "drizzle-orm/pg-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, serial } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -6,34 +6,19 @@ import { integer, pgEnum, pgTable, text, timestamp, varchar, serial } from "driz
  * Columns use camelCase to match both database fields and generated types.
  */
 
-// Enums
-export const roleEnum = pgEnum("role", ["user", "admin"]);
-export const formatEnum = pgEnum("format", ["B2B", "B2C", "mixed"]);
-export const interviewTypeEnum = pgEnum("interview_type", ["voice", "form_full", "form_short"]);
-export const statusEnum = pgEnum("status", ["draft", "in_progress", "completed", "failed"]);
-export const processStatusEnum = pgEnum("process_status", ["draft", "in_review", "approved"]);
-export const categoryEnum = pgEnum("category", ["optimization", "automation", "risk", "metric"]);
-export const priorityEnum = pgEnum("priority", ["high", "medium", "low"]);
-export const chatStatusEnum = pgEnum("chat_status", ["open", "closed"]);
-export const senderRoleEnum = pgEnum("sender_role", ["user", "admin"]);
-
-
-export const users = pgTable("users", {
-  /**
-   * Surrogate primary key. Auto-incremented numeric value managed by the database.
-   * Use this for relations between tables.
-   */
+// Users table
+export const users = mysqlTable("users", {
   id: serial("id").primaryKey(),
   email: varchar("email", { length: 320 }).unique(),
   phone: varchar("phone", { length: 20 }).unique(),
   name: text("name"),
-  passwordHash: varchar("password_hash", { length: 255 }), // For email/password auth
-  provider: varchar("provider", { length: 64 }), // 'google' or 'local'
-  providerId: varchar("provider_id", { length: 255 }), // Google ID or null for local
-  role: roleEnum("role").default("user").notNull(),
-  tokenBalance: integer("token_balance").default(1000).notNull(),
+  passwordHash: varchar("password_hash", { length: 255 }),
+  provider: varchar("provider", { length: 64 }),
+  providerId: varchar("provider_id", { length: 255 }),
+  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  tokenBalance: int("token_balance").default(1000).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("last_signed_in").defaultNow().notNull(),
 });
 
@@ -41,17 +26,16 @@ export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
 // Companies table
-export const companies = pgTable("companies", {
+export const companies = mysqlTable("companies", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  userId: int("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }).notNull(),
   industry: varchar("industry", { length: 255 }),
   region: varchar("region", { length: 255 }),
-  format: formatEnum("format"),
+  format: mysqlEnum("format", ["B2B", "B2C", "mixed"]),
   averageCheck: varchar("average_check", { length: 100 }),
   productsServices: text("products_services"),
   itSystems: text("it_systems"),
-  // Расширенные данные из полной анкеты (50 вопросов)
   businessModel: text("business_model"),
   clientSegments: text("client_segments"),
   keyProducts: text("key_products"),
@@ -59,39 +43,37 @@ export const companies = pgTable("companies", {
   seasonality: text("seasonality"),
   strategicGoals: text("strategic_goals"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
 
 export type Company = typeof companies.$inferSelect;
 export type InsertCompany = typeof companies.$inferInsert;
 
 // Interviews table
-export const interviews = pgTable("interviews", {
+export const interviews = mysqlTable("interviews", {
   id: serial("id").primaryKey(),
-  companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
-  interviewType: interviewTypeEnum("interview_type").default("voice").notNull(),
-  status: statusEnum("status").default("in_progress").notNull(),
+  companyId: int("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  interviewType: mysqlEnum("interview_type", ["voice", "form_full", "form_short"]).default("voice").notNull(),
+  status: mysqlEnum("status", ["draft", "in_progress", "completed", "failed"]).default("in_progress").notNull(),
   audioUrl: text("audio_url"),
   transcript: text("transcript"),
   structuredData: text("structured_data"),
-  // Ответы на вопросы анкеты (JSON)
   answers: text("answers"),
-  // Прогресс заполнения для черновиков
-  progress: integer("progress").default(0),
+  progress: int("progress").default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
 
 export type Interview = typeof interviews.$inferSelect;
 export type InsertInterview = typeof interviews.$inferInsert;
 
 // Business processes table
-export const businessProcesses = pgTable("business_processes", {
+export const businessProcesses = mysqlTable("business_processes", {
   id: serial("id").primaryKey(),
-  companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
-  interviewId: integer("interview_id").references(() => interviews.id, { onDelete: "set null" }),
-  version: integer("version").default(1).notNull(),
-  status: processStatusEnum("status").default("draft").notNull(),
+  companyId: int("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  interviewId: int("interview_id").references(() => interviews.id, { onDelete: "set null" }),
+  version: int("version").default(1).notNull(),
+  status: mysqlEnum("process_status", ["draft", "in_review", "approved"]).default("draft").notNull(),
   title: varchar("title", { length: 500 }).notNull(),
   description: text("description"),
   startEvent: text("start_event"),
@@ -103,28 +85,26 @@ export const businessProcesses = pgTable("business_processes", {
   documents: text("documents"),
   itIntegration: text("it_integration"),
   diagramData: text("diagram_data"),
-  // BPMN 2.0 XML диаграмма
   bpmnXml: text("bpmn_xml"),
-  // Расширенные данные для новой функциональности
-  stageDetails: text("stage_details"), // Детальное описание каждого этапа (JSON)
-  totalTime: integer("total_time"), // Общее время процесса в минутах
-  totalCost: integer("total_cost"), // Общая стоимость процесса по ФОТ в рублях
-  crmFunnels: text("crm_funnels"), // 3 варианта воронок CRM (JSON)
-  requiredDocuments: text("required_documents"), // Список необходимых документов (JSON)
-  salaryData: text("salary_data"), // Данные о зарплатах ролей (JSON)
+  stageDetails: text("stage_details"),
+  totalTime: int("total_time"),
+  totalCost: int("total_cost"),
+  crmFunnels: text("crm_funnels"),
+  requiredDocuments: text("required_documents"),
+  salaryData: text("salary_data"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
 
 export type BusinessProcess = typeof businessProcesses.$inferSelect;
 export type InsertBusinessProcess = typeof businessProcesses.$inferInsert;
 
 // Recommendations table
-export const recommendations = pgTable("recommendations", {
+export const recommendations = mysqlTable("recommendations", {
   id: serial("id").primaryKey(),
-  businessProcessId: integer("business_process_id").notNull().references(() => businessProcesses.id, { onDelete: "cascade" }),
-  category: categoryEnum("category").notNull(),
-  priority: priorityEnum("priority").default("medium").notNull(),
+  businessProcessId: int("business_process_id").notNull().references(() => businessProcesses.id, { onDelete: "cascade" }),
+  category: mysqlEnum("category", ["optimization", "automation", "risk", "metric"]).notNull(),
+  priority: mysqlEnum("priority", ["high", "medium", "low"]).default("medium").notNull(),
   title: varchar("title", { length: 500 }).notNull(),
   description: text("description"),
   toolsSuggested: text("tools_suggested"),
@@ -135,10 +115,10 @@ export type Recommendation = typeof recommendations.$inferSelect;
 export type InsertRecommendation = typeof recommendations.$inferInsert;
 
 // Comments table
-export const comments = pgTable("comments", {
+export const comments = mysqlTable("comments", {
   id: serial("id").primaryKey(),
-  businessProcessId: integer("business_process_id").notNull().references(() => businessProcesses.id, { onDelete: "cascade" }),
-  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  businessProcessId: int("business_process_id").notNull().references(() => businessProcesses.id, { onDelete: "cascade" }),
+  userId: int("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   stepId: varchar("step_id", { length: 100 }),
   content: text("content").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -147,15 +127,15 @@ export const comments = pgTable("comments", {
 export type Comment = typeof comments.$inferSelect;
 export type InsertComment = typeof comments.$inferInsert;
 
-// Documents table - прикрепленные документы к компании
-export const documents = pgTable("documents", {
+// Documents table
+export const documents = mysqlTable("documents", {
   id: serial("id").primaryKey(),
-  companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
-  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  companyId: int("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  userId: int("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   fileName: varchar("file_name", { length: 255 }).notNull(),
   fileUrl: text("file_url").notNull(),
   fileKey: varchar("file_key", { length: 500 }).notNull(),
-  fileSize: integer("file_size"),
+  fileSize: int("file_size"),
   mimeType: varchar("mime_type", { length: 100 }),
   description: text("description"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -164,10 +144,10 @@ export const documents = pgTable("documents", {
 export type Document = typeof documents.$inferSelect;
 export type InsertDocument = typeof documents.$inferInsert;
 
-// Error logs table - логи ошибок системы
-export const errorLogs = pgTable("error_logs", {
+// Error logs table
+export const errorLogs = mysqlTable("error_logs", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").references(() => users.id, { onDelete: "set null" }),
+  userId: int("user_id").references(() => users.id, { onDelete: "set null" }),
   errorType: varchar("error_type", { length: 100 }).notNull(),
   errorMessage: text("error_message").notNull(),
   stackTrace: text("stack_trace"),
@@ -181,101 +161,77 @@ export const errorLogs = pgTable("error_logs", {
 export type ErrorLog = typeof errorLogs.$inferSelect;
 export type InsertErrorLog = typeof errorLogs.$inferInsert;
 
-// Support chats table - чаты поддержки
-export const supportChats = pgTable("support_chats", {
+// Support chats table
+export const supportChats = mysqlTable("support_chats", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  status: chatStatusEnum("status").default("open").notNull(),
+  userId: int("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  status: mysqlEnum("chat_status", ["open", "closed"]).default("open").notNull(),
   lastMessageAt: timestamp("last_message_at").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
 
 export type SupportChat = typeof supportChats.$inferSelect;
 export type InsertSupportChat = typeof supportChats.$inferInsert;
 
-// Support messages table - сообщения в чатах поддержки
-export const supportMessages = pgTable("support_messages", {
+// Support messages table
+export const supportMessages = mysqlTable("support_messages", {
   id: serial("id").primaryKey(),
-  chatId: integer("chat_id").notNull().references(() => supportChats.id, { onDelete: "cascade" }),
-  senderId: integer("sender_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  senderRole: senderRoleEnum("sender_role").notNull(),
+  chatId: int("chat_id").notNull().references(() => supportChats.id, { onDelete: "cascade" }),
+  senderId: int("sender_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  senderRole: mysqlEnum("sender_role", ["user", "admin"]).notNull(),
   message: text("message").notNull(),
-  isRead: integer("is_read").default(0).notNull(), // 0 = не прочитано, 1 = прочитано
+  isRead: int("is_read").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export type SupportMessage = typeof supportMessages.$inferSelect;
 export type InsertSupportMessage = typeof supportMessages.$inferInsert;
 
-/**
- * FAQ articles table for knowledge base
- */
-export const faqArticles = pgTable("faq_articles", {
+// FAQ articles table
+export const faqArticles = mysqlTable("faq_articles", {
   id: serial("id").primaryKey(),
   question: text("question").notNull(),
   answer: text("answer").notNull(),
-  keywords: text("keywords").notNull(), // Comma-separated keywords for search
+  keywords: text("keywords").notNull(),
   category: varchar("category", { length: 100 }),
-  order: integer("order").default(0).notNull(), // Display order
-  isPublished: integer("is_published").default(1).notNull(), // 1 = published, 0 = draft
+  order: int("order").default(0).notNull(),
+  isPublished: int("is_published").default(1).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
 
 export type FaqArticle = typeof faqArticles.$inferSelect;
 export type InsertFaqArticle = typeof faqArticles.$inferInsert;
 
-// Enums for change requests
-export const changeRequestStatusEnum = pgEnum("change_request_status", [
-  "pending",      // Запрос создан, ожидает обработки
-  "processing",   // AI обрабатывает запрос
-  "preview",      // Изменения готовы к предпросмотру
-  "applied",      // Изменения применены
-  "rejected",     // Изменения отклонены
-  "rolled_back"   // Изменения откачены
-]);
-
-// Change Requests table - запросы на изменения бизнес-процесса
-export const changeRequests = pgTable("change_requests", {
+// Change Requests table
+export const changeRequests = mysqlTable("change_requests", {
   id: serial("id").primaryKey(),
-  businessProcessId: integer("business_process_id").notNull().references(() => businessProcesses.id, { onDelete: "cascade" }),
-  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  status: changeRequestStatusEnum("status").default("pending").notNull(),
-  
-  // Запрос пользователя
-  requestText: text("request_text").notNull(), // Описание желаемых изменений
-  requestType: varchar("request_type", { length: 50 }), // add_step, modify_step, delete_step, change_flow, optimize
-  targetStepId: varchar("target_step_id", { length: 100 }), // ID шага, если изменение касается конкретного шага
-  
-  // Результат обработки AI
-  proposedChanges: text("proposed_changes"), // JSON с предлагаемыми изменениями
-  changesSummary: text("changes_summary"), // Краткое описание изменений для пользователя
-  
-  // Прогресс обработки
-  progress: integer("progress").default(0), // 0-100%
-  progressMessage: varchar("progress_message", { length: 255 }), // Текущий этап обработки
-  
-  // Связь с версиями
-  previousVersionId: integer("previous_version_id"), // ID версии до изменений
-  newVersionId: integer("new_version_id"), // ID версии после изменений
-  
+  businessProcessId: int("business_process_id").notNull().references(() => businessProcesses.id, { onDelete: "cascade" }),
+  userId: int("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  status: mysqlEnum("change_request_status", ["pending", "processing", "preview", "applied", "rejected", "rolled_back"]).default("pending").notNull(),
+  requestText: text("request_text").notNull(),
+  requestType: varchar("request_type", { length: 50 }),
+  targetStepId: varchar("target_step_id", { length: 100 }),
+  proposedChanges: text("proposed_changes"),
+  changesSummary: text("changes_summary"),
+  progress: int("progress").default(0),
+  progressMessage: varchar("progress_message", { length: 255 }),
+  newVersionId: int("new_version_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-  appliedAt: timestamp("applied_at"), // Когда изменения были применены
-  rolledBackAt: timestamp("rolled_back_at"), // Когда изменения были откачены
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+  appliedAt: timestamp("applied_at"),
+  rolledBackAt: timestamp("rolled_back_at"),
 });
 
 export type ChangeRequest = typeof changeRequests.$inferSelect;
 export type InsertChangeRequest = typeof changeRequests.$inferInsert;
 
-// Process Versions table - версии бизнес-процессов для отката
-export const processVersions = pgTable("process_versions", {
+// Process Versions table
+export const processVersions = mysqlTable("process_versions", {
   id: serial("id").primaryKey(),
-  businessProcessId: integer("business_process_id").notNull().references(() => businessProcesses.id, { onDelete: "cascade" }),
-  versionNumber: integer("version_number").notNull(),
-  
-  // Снимок данных процесса
+  businessProcessId: int("business_process_id").notNull().references(() => businessProcesses.id, { onDelete: "cascade" }),
+  versionNumber: int("version_number").notNull(),
   title: varchar("title", { length: 500 }).notNull(),
   description: text("description"),
   stages: text("stages"),
@@ -286,19 +242,14 @@ export const processVersions = pgTable("process_versions", {
   itIntegration: text("it_integration"),
   diagramData: text("diagram_data"),
   stageDetails: text("stage_details"),
-  totalTime: integer("total_time"),
-  totalCost: integer("total_cost"),
-  
-  // Метаданные версии
-  changeRequestId: integer("change_request_id"), // ID запроса, который создал эту версию
-  changeSummary: text("change_summary"), // Описание изменений в этой версии
-  createdById: integer("created_by_id").references(() => users.id, { onDelete: "set null" }),
-  isActive: integer("is_active").default(0).notNull(), // 1 = текущая активная версия
-  
+  totalTime: int("total_time"),
+  totalCost: int("total_cost"),
+  changeRequestId: int("change_request_id"),
+  changeSummary: text("change_summary"),
+  createdById: int("created_by_id").references(() => users.id, { onDelete: "set null" }),
+  isActive: int("is_active").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export type ProcessVersion = typeof processVersions.$inferSelect;
 export type InsertProcessVersion = typeof processVersions.$inferInsert;
-
-

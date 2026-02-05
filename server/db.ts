@@ -1,6 +1,6 @@
 import { eq, like, and, or } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
+import { drizzle } from "drizzle-orm/mysql2";
+import mysql from "mysql2/promise";
 import { 
   InsertUser, users,
   InsertCompany, companies,
@@ -17,7 +17,7 @@ import {
 import { ENV } from './_core/env';
 
 // Global connection pool - reuses connections efficiently
-let pool: Pool | null = null;
+let pool: mysql.Pool | null = null;
 
 // Initialize connection pool (called once on server start)
 function initPool() {
@@ -30,22 +30,28 @@ function initPool() {
     return pool;
   }
 
-  console.log('[Database] Initializing connection pool...');
-  pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
+  console.log('[Database] Initializing MySQL connection pool...');
+  
+  // Parse DATABASE_URL for TiDB/MySQL connection
+  const dbUrl = new URL(process.env.DATABASE_URL);
+  
+  pool = mysql.createPool({
+    host: dbUrl.hostname,
+    port: parseInt(dbUrl.port) || 4000,
+    user: dbUrl.username,
+    password: dbUrl.password,
+    database: dbUrl.pathname.slice(1), // Remove leading slash
+    waitForConnections: true,
+    connectionLimit: 20,
+    queueLimit: 0,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 0,
     ssl: {
       rejectUnauthorized: false
-    },
-    max: 20, // Maximum number of clients in the pool
-    idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
-    connectionTimeoutMillis: 10000, // Return error after 10 seconds if unable to connect
+    }
   });
 
-  pool.on('error', (err) => {
-    console.error('[Database] Unexpected pool error:', err);
-  });
-
-  console.log('[Database] Connection pool initialized');
+  console.log('[Database] MySQL connection pool initialized');
   return pool;
 }
 
@@ -89,10 +95,10 @@ export function getPoolMetrics() {
   }
 
   return {
-    totalConnections: pool.totalCount,
-    idleConnections: pool.idleCount,
-    waitingRequests: pool.waitingCount,
-    maxConnections: pool.options.max || 20,
+    totalConnections: 0,
+    idleConnections: 0,
+    waitingRequests: 0,
+    maxConnections: 20,
     status: 'active'
   };
 }
@@ -117,7 +123,7 @@ export async function createUser(data: { email?: string; phone?: string; name?: 
     values.role = 'admin';
   }
 
-  const result = await db.insert(users).values(values).returning({ id: users.id });
+  const result = await db.insert(users).values(values).$returningId();
   const userId = result[0].id;
   
   const user = await getUserById(userId);
@@ -170,7 +176,7 @@ export async function getUserByOpenId(openId: string) {
 export async function createCompany(company: InsertCompany) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(companies).values(company).returning({ id: companies.id });
+  const result = await db.insert(companies).values(company).$returningId();
   return result[0].id;
 }
 
@@ -203,7 +209,7 @@ export async function deleteCompany(id: number) {
 export async function createInterview(interview: InsertInterview) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(interviews).values(interview).returning({ id: interviews.id });
+  const result = await db.insert(interviews).values(interview).$returningId();
   return result[0].id;
 }
 
@@ -224,7 +230,7 @@ export async function updateInterview(id: number, data: Partial<InsertInterview>
 export async function createBusinessProcess(process: InsertBusinessProcess) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(businessProcesses).values(process).returning({ id: businessProcesses.id });
+  const result = await db.insert(businessProcesses).values(process).$returningId();
   return result[0].id;
 }
 
@@ -262,7 +268,7 @@ export async function deleteBusinessProcess(id: number) {
 export async function createRecommendation(recommendation: InsertRecommendation) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(recommendations).values(recommendation).returning({ id: recommendations.id });
+  const result = await db.insert(recommendations).values(recommendation).$returningId();
   return result[0].id;
 }
 
@@ -276,7 +282,7 @@ export async function getProcessRecommendations(businessProcessId: number) {
 export async function createComment(comment: InsertComment) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(comments).values(comment).returning({ id: comments.id });
+  const result = await db.insert(comments).values(comment).$returningId();
   return result[0].id;
 }
 
@@ -339,7 +345,7 @@ export async function saveDraftInterview(interview: InsertInterview) {
     const result = await db.insert(interviews).values({
       ...interview,
       status: "draft",
-    }).returning({ id: interviews.id });
+    }).$returningId();
     return result[0]?.id;
   }
 }
@@ -490,7 +496,7 @@ export async function createSupportChat(userId: number) {
     userId,
     status: "open",
     lastMessageAt: new Date(),
-  }).returning({ id: supportChats.id });
+  }).$returningId();
 
   return result[0].id;
 }
@@ -697,7 +703,7 @@ export async function createFaqArticle(article: InsertFaqArticle): Promise<numbe
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   
-  const result = await db.insert(faqArticles).values(article).returning({ id: faqArticles.id });
+  const result = await db.insert(faqArticles).values(article).$returningId();
   return result[0].id;
 }
 

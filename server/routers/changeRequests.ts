@@ -47,7 +47,7 @@ export const changeRequestsRouter = router({
       }
 
       // Создаём запрос
-      const [newRequest] = await db.insert(changeRequests).values({
+      const insertResult = await db.insert(changeRequests).values({
         businessProcessId: input.businessProcessId,
         userId: ctx.user.id,
         requestText: input.requestText,
@@ -56,7 +56,10 @@ export const changeRequestsRouter = router({
         status: "pending",
         progress: 0,
         progressMessage: "Запрос создан, ожидает обработки",
-      }).returning();
+      }).$returningId();
+      
+      const newRequestId = insertResult[0].id;
+      const [newRequest] = await db.select().from(changeRequests).where(eq(changeRequests.id, newRequestId)).limit(1);
 
       // Запускаем асинхронную обработку
       processChangeRequest(newRequest.id).catch(console.error);
@@ -169,7 +172,7 @@ export const changeRequestsRouter = router({
         .limit(1);
 
       // Сохраняем текущую версию перед изменениями
-      const [previousVersion] = await db.insert(processVersions).values({
+      const prevVersionInsertResult = await db.insert(processVersions).values({
         businessProcessId: process.id,
         versionNumber: process.version,
         title: process.title,
@@ -188,7 +191,10 @@ export const changeRequestsRouter = router({
         changeSummary: "Версия до изменений",
         createdById: ctx.user.id,
         isActive: 0,
-      }).returning();
+      }).$returningId();
+      
+      const prevVersionId = prevVersionInsertResult[0].id;
+      const [previousVersion] = await db.select().from(processVersions).where(eq(processVersions.id, prevVersionId)).limit(1);
 
       // Применяем изменения
       const proposedChanges = request.proposedChanges ? JSON.parse(request.proposedChanges) as ProposedChanges : null;
@@ -206,7 +212,7 @@ export const changeRequestsRouter = router({
       }
 
       // Создаём новую версию
-      const [newVersion] = await db.insert(processVersions).values({
+      const versionInsertResult = await db.insert(processVersions).values({
         businessProcessId: process.id,
         versionNumber: process.version + 1,
         title: process.title,
@@ -225,13 +231,15 @@ export const changeRequestsRouter = router({
         changeSummary: request.changesSummary,
         createdById: ctx.user.id,
         isActive: 1,
-      }).returning();
+      }).$returningId();
+      
+      const newVersionId = versionInsertResult[0].id;
+      const [newVersion] = await db.select().from(processVersions).where(eq(processVersions.id, newVersionId)).limit(1);
 
       // Обновляем статус запроса
       await db.update(changeRequests)
         .set({
           status: "applied",
-          previousVersionId: previousVersion.id,
           newVersionId: newVersion.id,
           appliedAt: new Date(),
           updatedAt: new Date(),
@@ -282,15 +290,17 @@ export const changeRequestsRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Можно откатить только применённые изменения" });
       }
 
-      if (!request.previousVersionId) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Нет предыдущей версии для отката" });
-      }
-
-      // Получаем предыдущую версию
-      const [previousVersion] = await db.select()
+      // Получаем предыдущую версию (версия до изменений)
+      const previousVersions = await db.select()
         .from(processVersions)
-        .where(eq(processVersions.id, request.previousVersionId))
+        .where(and(
+          eq(processVersions.businessProcessId, request.businessProcessId),
+          eq(processVersions.changeSummary, "Версия до изменений")
+        ))
+        .orderBy(desc(processVersions.createdAt))
         .limit(1);
+      
+      const [previousVersion] = previousVersions;
 
       if (!previousVersion) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Предыдущая версия не найдена" });

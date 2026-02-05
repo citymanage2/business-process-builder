@@ -1,0 +1,55 @@
+{
+  "query": "SHOW TABLES;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2caBidRtXS3CBxe.9f9b2212b9bd --database AtkYmgPLTEDMC5w2gAV6C3 --execute SHOW TABLES;",
+  "rows": [
+    {
+      "Tables_in_AtkYmgPLTEDMC5w2gAV6C3": "__drizzle_migrations"
+    },
+    {
+      "Tables_in_AtkYmgPLTEDMC5w2gAV6C3": "businessProcesses"
+    },
+    {
+      "Tables_in_AtkYmgPLTEDMC5w2gAV6C3": "change_requests"
+    },
+    {
+      "Tables_in_AtkYmgPLTEDMC5w2gAV6C3": "comments"
+    },
+    {
+      "Tables_in_AtkYmgPLTEDMC5w2gAV6C3": "companies"
+    },
+    {
+      "Tables_in_AtkYmgPLTEDMC5w2gAV6C3": "documents"
+    },
+    {
+      "Tables_in_AtkYmgPLTEDMC5w2gAV6C3": "errorLogs"
+    },
+    {
+      "Tables_in_AtkYmgPLTEDMC5w2gAV6C3": "faq_articles"
+    },
+    {
+      "Tables_in_AtkYmgPLTEDMC5w2gAV6C3": "interviews"
+    },
+    {
+      "Tables_in_AtkYmgPLTEDMC5w2gAV6C3": "process_versions"
+    },
+    {
+      "Tables_in_AtkYmgPLTEDMC5w2gAV6C3": "recommendations"
+    },
+    {
+      "Tables_in_AtkYmgPLTEDMC5w2gAV6C3": "supportChats"
+    },
+    {
+      "Tables_in_AtkYmgPLTEDMC5w2gAV6C3": "supportMessages"
+    },
+    {
+      "Tables_in_AtkYmgPLTEDMC5w2gAV6C3": "users"
+    },
+    {
+      "Tables_in_AtkYmgPLTEDMC5w2gAV6C3": "verification_tokens"
+    }
+  ],
+  "messages": [],
+  "stdout": "Tables_in_AtkYmgPLTEDMC5w2gAV6C3\n__drizzle_migrations\nbusinessProcesses\nchange_requests\ncomments\ncompanies\ndocuments\nerrorLogs\nfaq_articles\ninterviews\nprocess_versions\nrecommendations\nsupportChats\nsupportMessages\nusers\nverification_tokens\n",
+  "stderr": "",
+  "execution_time_ms": 455
+}
