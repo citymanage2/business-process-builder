@@ -99,6 +99,15 @@ export default function ProcessView() {
     },
   });
 
+  const saveBpmnXmlMutation = trpc.processes.saveBpmnXml.useMutation({
+    onSuccess: () => {
+      toast.success("Диаграмма сохранена");
+    },
+    onError: (error) => {
+      toast.error(`Ошибка сохранения: ${error.message}`);
+    },
+  });
+
   const handleGenerateRecommendations = () => {
     generateRecommendationsMutation.mutate({ processId });
   };
@@ -186,10 +195,10 @@ export default function ProcessView() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        <Tabs defaultValue="diagram" className="w-full">
+        <Tabs defaultValue="bpmn" className="w-full">
           <TabsList className="grid w-full grid-cols-7 max-w-5xl">
-            <TabsTrigger value="diagram">Диаграмма</TabsTrigger>
-            <TabsTrigger value="bpmn">BPMN Редактор</TabsTrigger>
+            <TabsTrigger value="bpmn">Диаграмма</TabsTrigger>
+            <TabsTrigger value="diagram">Схема Swimlane</TabsTrigger>
             <TabsTrigger value="stages">Этапы</TabsTrigger>
             <TabsTrigger value="metrics">Метрики</TabsTrigger>
             <TabsTrigger value="funnels">CRM</TabsTrigger>
@@ -273,10 +282,61 @@ export default function ProcessView() {
           <TabsContent value="bpmn" className="mt-6">
             <Card>
               <CardHeader>
-                <CardTitle>BPMN 2.0 Редактор</CardTitle>
-                <CardDescription>
-                  Профессиональный редактор диаграмм на базе bpmn.io. Поддерживает drag-and-drop, экспорт в BPMN XML и SVG.
-                </CardDescription>
+                <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
+                  <div className="flex-1 min-w-0">
+                    <CardTitle className="mb-2">Диаграмма бизнес-процесса</CardTitle>
+                    <CardDescription className="break-words">
+                      Интерактивный BPMN 2.0 редактор на базе bpmn.io. Поддерживает drag-and-drop, экспорт в BPMN XML и SVG.
+                    </CardDescription>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Dialog open={changeRequestDialogOpen} onOpenChange={setChangeRequestDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="default" size="sm" className="gap-2">
+                          <MessageSquarePlus className="w-4 h-4" />
+                          Запросить изменения
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                        <DialogHeader>
+                          <DialogTitle>Запросить изменения</DialogTitle>
+                          <DialogDescription>
+                            Опишите желаемые изменения в бизнес-процессе
+                          </DialogDescription>
+                        </DialogHeader>
+                        <ChangeRequestPanel 
+                          businessProcessId={processId} 
+                          onClose={() => {
+                            setChangeRequestDialogOpen(false);
+                            refetch();
+                          }}
+                        />
+                      </DialogContent>
+                    </Dialog>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setRegenerateDialogOpen(true)}
+                    >
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Сгенерировать заново
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        toast.promise(exportProcessToPDF(process), {
+                          loading: "Генерация PDF...",
+                          success: "PDF успешно создан",
+                          error: "Ошибка при создании PDF",
+                        });
+                      }}
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      PDF
+                    </Button>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 <BpmnEditor
@@ -287,8 +347,13 @@ export default function ProcessView() {
                     stages: process.stages || [],
                     steps: process.steps || []
                   }}
+                  initialXml={process.bpmnXml || undefined}
                   editable={true}
                   height="700px"
+                  onSave={(xml) => {
+                    // Сохраняем BPMN XML в БД
+                    saveBpmnXmlMutation.mutate({ processId: process.id, bpmnXml: xml });
+                  }}
                 />
               </CardContent>
             </Card>

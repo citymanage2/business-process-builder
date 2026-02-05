@@ -15,6 +15,7 @@ import {
 import { invokeLLM } from "../_core/llm";
 import { OPERATION_COSTS } from "@shared/costs";
 import { buildProcessPrompt } from "../prompts";
+import { generateBPMNFromDbProcess } from "../bpmnGenerator";
 
 export const processesRouter = router({
   generate: protectedProcedure
@@ -126,6 +127,8 @@ export const processesRouter = router({
         documents: JSON.stringify(processData.documents),
         itIntegration: JSON.stringify(processData.itIntegration),
         diagramData: JSON.stringify(processData),
+        // Генерируем BPMN XML сразу при создании
+        bpmnXml: null, // Будет сгенерировано после создания
         // Новые поля
         stageDetails: processData.stageDetails ? JSON.stringify(processData.stageDetails) : null,
         totalTime: processData.metrics?.totalTimeMinutes || null,
@@ -135,6 +138,17 @@ export const processesRouter = router({
         salaryData: processData.metrics?.roleWorkload ? JSON.stringify(processData.metrics.roleWorkload) : null,
         status: "draft",
       });
+
+      // Генерируем BPMN XML и сохраняем
+      const bpmnXml = generateBPMNFromDbProcess({
+        id,
+        title: processData.title,
+        roles: JSON.stringify(processData.roles),
+        stages: JSON.stringify(processData.stages),
+        steps: JSON.stringify(processData.steps),
+      });
+      
+      await updateBusinessProcess(id, { bpmnXml });
 
       // Списываем токены после успешной генерации
       const deducted = await deductTokens(ctx.user.id, cost);
@@ -146,7 +160,7 @@ export const processesRouter = router({
       const newBalance = await getUserBalance(ctx.user.id);
       console.log(`[Process Generation] Process created successfully. User ${ctx.user.id} new balance: ${newBalance}`);
 
-      return { id, process: processData, tokensDeducted: cost, newBalance };
+      return { id, process: processData, bpmnXml, tokensDeducted: cost, newBalance };
     }),
   list: protectedProcedure
     .input(z.object({ companyId: z.number() }))
@@ -173,6 +187,8 @@ export const processesRouter = router({
         crmFunnels: (process.crmFunnels && process.crmFunnels !== 'null') ? JSON.parse(process.crmFunnels) : [],
         requiredDocuments: (process.requiredDocuments && process.requiredDocuments !== 'null') ? JSON.parse(process.requiredDocuments) : [],
         salaryData: (process.salaryData && process.salaryData !== 'null') ? JSON.parse(process.salaryData) : [],
+        // BPMN XML
+        bpmnXml: process.bpmnXml || null,
       };
     }),
   update: protectedProcedure
@@ -628,6 +644,64 @@ ${JSON.stringify(currentData, null, 2)}
 
       return {
         success: true,
+      };
+    }),
+
+  // Сохранение BPMN XML
+  saveBpmnXml: protectedProcedure
+    .input(z.object({
+      processId: z.number(),
+      bpmnXml: z.string(),
+    }))
+    .mutation(async ({ input }) => {
+      const process = await getProcessById(input.processId);
+      if (!process) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Процесс не найден',
+        });
+      }
+
+      await updateBusinessProcess(input.processId, {
+        bpmnXml: input.bpmnXml,
+      });
+
+      console.log(`[Process] BPMN XML saved for process ${input.processId}`);
+
+      return {
+        success: true,
+      };
+    }),
+
+  // Регенерация BPMN XML из данных процесса
+  regenerateBpmnXml: protectedProcedure
+    .input(z.object({
+      processId: z.number(),
+    }))
+    .mutation(async ({ input }) => {
+      const process = await getProcessById(input.processId);
+      if (!process) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Процесс не найден',
+        });
+      }
+
+      const bpmnXml = generateBPMNFromDbProcess({
+        id: process.id,
+        title: process.title,
+        roles: process.roles,
+        stages: process.stages,
+        steps: process.steps,
+      });
+
+      await updateBusinessProcess(input.processId, { bpmnXml });
+
+      console.log(`[Process] BPMN XML regenerated for process ${input.processId}`);
+
+      return {
+        success: true,
+        bpmnXml,
       };
     }),
 });

@@ -66,6 +66,7 @@ interface ProcessData {
 
 interface BpmnEditorProps {
   process: ProcessData;
+  initialXml?: string;
   onSave?: (xml: string) => void;
   editable?: boolean;
   height?: string;
@@ -354,6 +355,7 @@ function generateBPMNXML(process: ProcessData): string {
 
 export default function BpmnEditor({ 
   process, 
+  initialXml,
   onSave, 
   editable = true,
   height = "600px" 
@@ -376,8 +378,8 @@ export default function BpmnEditor({
 
     modelerRef.current = modeler;
 
-    // Генерируем XML из данных процесса
-    const xml = generateBPMNXML(process);
+    // Используем initialXml если есть, иначе генерируем из данных процесса
+    const xml = initialXml || generateBPMNXML(process);
     setCurrentXml(xml);
 
     // Импортируем XML в редактор
@@ -407,7 +409,7 @@ export default function BpmnEditor({
     return () => {
       modeler.destroy();
     };
-  }, [process]);
+  }, [process, initialXml]);
 
   // Zoom In
   const handleZoomIn = useCallback(() => {

@@ -103,6 +103,8 @@ export const businessProcesses = pgTable("business_processes", {
   documents: text("documents"),
   itIntegration: text("it_integration"),
   diagramData: text("diagram_data"),
+  // BPMN 2.0 XML диаграмма
+  bpmnXml: text("bpmn_xml"),
   // Расширенные данные для новой функциональности
   stageDetails: text("stage_details"), // Детальное описание каждого этапа (JSON)
   totalTime: integer("total_time"), // Общее время процесса в минутах
