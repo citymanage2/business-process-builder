@@ -15,6 +15,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import ProcessDiagramSwimlane from "@/components/ProcessDiagramSwimlane";
+import BpmnEditor from "@/components/BpmnEditor";
 import ProcessModificationDialog from "@/components/ProcessModificationDialog";
 import ProcessMetrics from "@/components/ProcessMetrics";
 import CRMFunnels from "@/components/CRMFunnels";
@@ -186,8 +187,9 @@ export default function ProcessView() {
 
       <main className="container mx-auto px-4 py-8">
         <Tabs defaultValue="diagram" className="w-full">
-          <TabsList className="grid w-full grid-cols-6 max-w-4xl">
+          <TabsList className="grid w-full grid-cols-7 max-w-5xl">
             <TabsTrigger value="diagram">Диаграмма</TabsTrigger>
+            <TabsTrigger value="bpmn">BPMN Редактор</TabsTrigger>
             <TabsTrigger value="stages">Этапы</TabsTrigger>
             <TabsTrigger value="metrics">Метрики</TabsTrigger>
             <TabsTrigger value="funnels">CRM</TabsTrigger>
@@ -263,6 +265,30 @@ export default function ProcessView() {
                   editable={true}
                   onStepUpdate={handleStepUpdate}
                   onStepDelete={handleStepDelete}
+                />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="bpmn" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>BPMN 2.0 Редактор</CardTitle>
+                <CardDescription>
+                  Профессиональный редактор диаграмм на базе bpmn.io. Поддерживает drag-and-drop, экспорт в BPMN XML и SVG.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <BpmnEditor
+                  process={{
+                    id: process.id,
+                    title: process.title,
+                    roles: process.roles || [],
+                    stages: process.stages || [],
+                    steps: process.steps || []
+                  }}
+                  editable={true}
+                  height="700px"
                 />
               </CardContent>
             </Card>
