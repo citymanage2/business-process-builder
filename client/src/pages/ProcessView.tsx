@@ -14,16 +14,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import ProcessDiagramSwimlane from "@/components/ProcessDiagramSwimlane";
 import BpmnEditor from "@/components/BpmnEditor";
-import ProcessModificationDialog from "@/components/ProcessModificationDialog";
-import ProcessMetrics from "@/components/ProcessMetrics";
-import CRMFunnels from "@/components/CRMFunnels";
-import RequiredDocuments from "@/components/RequiredDocuments";
-import StageDetails from "@/components/StageDetails";
-import ProgressIndicator from "@/components/ProgressIndicator";
+import ProcessDescription from "@/components/ProcessDescription";
 import { trpc } from "@/lib/trpc";
-import { Loader2, Sparkles, TrendingUp, AlertTriangle, Target, Download, RefreshCw, MessageSquarePlus, History } from "lucide-react";
+import { Loader2, Sparkles, Download, RefreshCw, MessageSquarePlus, FileText, GitBranch } from "lucide-react";
 import { toast } from "sonner";
 import { exportProcessToPDF } from "@/lib/pdfExport";
 import { OPERATION_COSTS } from "@shared/costs";
@@ -46,34 +40,6 @@ export default function ProcessView() {
 
   const { data: process, isLoading, refetch } = trpc.processes.get.useQuery({ id: processId });
 
-  const updateStepMutation = trpc.processes.updateStep.useMutation({
-    onSuccess: () => {
-      toast.success("Блок успешно обновлён");
-      refetch();
-    },
-    onError: (error: any) => {
-      toast.error(`Ошибка обновления: ${error.message}`);
-    },
-  });
-
-  const deleteStepMutation = trpc.processes.deleteStep.useMutation({
-    onSuccess: () => {
-      toast.success("Блок удалён");
-      refetch();
-    },
-    onError: (error: any) => {
-      toast.error(`Ошибка удаления: ${error.message}`);
-    },
-  });
-
-  const handleStepUpdate = (step: any) => {
-    updateStepMutation.mutate({ processId, step });
-  };
-
-  const handleStepDelete = (stepId: string) => {
-    deleteStepMutation.mutate({ processId, stepId });
-  };
-
   const regenerateMutation = trpc.processes.regenerate.useMutation({
     onSuccess: () => {
       toast.success("Процесс успешно перегенерирован");
@@ -87,18 +53,6 @@ export default function ProcessView() {
     },
   });
 
-  const recommendationsQuery = trpc.recommendations.list.useQuery({ processId });
-
-  const generateRecommendationsMutation = trpc.recommendations.generate.useMutation({
-    onSuccess: () => {
-      toast.success("Рекомендации сгенерированы");
-      recommendationsQuery.refetch();
-    },
-    onError: (error) => {
-      toast.error(`Ошибка: ${error.message}`);
-    },
-  });
-
   const saveBpmnXmlMutation = trpc.processes.saveBpmnXml.useMutation({
     onSuccess: () => {
       toast.success("Диаграмма сохранена");
@@ -107,10 +61,6 @@ export default function ProcessView() {
       toast.error(`Ошибка сохранения: ${error.message}`);
     },
   });
-
-  const handleGenerateRecommendations = () => {
-    generateRecommendationsMutation.mutate({ processId });
-  };
 
   const handleRegenerate = () => {
     setIsRegenerating(true);
@@ -138,28 +88,9 @@ export default function ProcessView() {
     );
   }
 
-  const categoryIcons: Record<string, any> = {
-    optimization: TrendingUp,
-    automation: Sparkles,
-    risk: AlertTriangle,
-    metric: Target,
-  };
-
-  const categoryLabels: Record<string, string> = {
-    optimization: "Оптимизация",
-    automation: "Автоматизация",
-    risk: "Риски",
-    metric: "Метрики",
-  };
-
-  const priorityColors: Record<string, string> = {
-    high: "destructive",
-    medium: "default",
-    low: "secondary",
-  };
-
   return (
     <div className="min-h-screen bg-background">
+      {/* Заголовок */}
       <header className="border-b bg-card">
         <div className="container mx-auto px-4 py-6">
           <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
@@ -171,170 +102,94 @@ export default function ProcessView() {
                 <Badge variant="outline" className="whitespace-nowrap">{process.endEvent}</Badge>
               </div>
             </div>
-            {(!recommendationsQuery.data || recommendationsQuery.data.length === 0) && (
+            <div className="flex flex-wrap gap-2">
+              <Dialog open={changeRequestDialogOpen} onOpenChange={setChangeRequestDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="default" size="sm" className="gap-2">
+                    <MessageSquarePlus className="w-4 h-4" />
+                    Запросить изменения
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Запросить изменения</DialogTitle>
+                    <DialogDescription>
+                      Опишите желаемые изменения в бизнес-процессе
+                    </DialogDescription>
+                  </DialogHeader>
+                  <ChangeRequestPanel 
+                    businessProcessId={processId} 
+                    onClose={() => {
+                      setChangeRequestDialogOpen(false);
+                      refetch();
+                    }}
+                  />
+                </DialogContent>
+              </Dialog>
               <Button
-                onClick={handleGenerateRecommendations}
-                disabled={generateRecommendationsMutation.isPending}
-                className="gap-2 flex-shrink-0 whitespace-nowrap"
+                variant="outline"
+                size="sm"
+                onClick={() => setRegenerateDialogOpen(true)}
               >
-                {generateRecommendationsMutation.isPending ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Генерация...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4" />
-                    Сгенерировать рекомендации
-                  </>
-                )}
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Сгенерировать заново
               </Button>
-            )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  toast.promise(exportProcessToPDF(process), {
+                    loading: "Генерация PDF...",
+                    success: "PDF успешно создан",
+                    error: "Ошибка при создании PDF",
+                  });
+                }}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                PDF
+              </Button>
+            </div>
           </div>
         </div>
       </header>
 
+      {/* Основной контент с вкладками */}
       <main className="container mx-auto px-4 py-8">
-        <Tabs defaultValue="bpmn" className="w-full">
-          <TabsList className="grid w-full grid-cols-7 max-w-5xl">
-            <TabsTrigger value="bpmn">Диаграмма</TabsTrigger>
-            <TabsTrigger value="diagram">Схема Swimlane</TabsTrigger>
-            <TabsTrigger value="stages">Этапы</TabsTrigger>
-            <TabsTrigger value="metrics">Метрики</TabsTrigger>
-            <TabsTrigger value="funnels">CRM</TabsTrigger>
-            <TabsTrigger value="documents">Документы</TabsTrigger>
-            <TabsTrigger value="recommendations">Рекомендации</TabsTrigger>
+        <Tabs defaultValue="description" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 max-w-md">
+            <TabsTrigger value="description" className="gap-2">
+              <FileText className="w-4 h-4" />
+              Описание
+            </TabsTrigger>
+            <TabsTrigger value="bpmn" className="gap-2">
+              <GitBranch className="w-4 h-4" />
+              BPMN Диаграмма
+            </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="diagram" className="mt-6">
-            <Card>
-              <CardHeader>
-                <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
-                  <div className="flex-1 min-w-0">
-                    <CardTitle className="mb-2">Визуализация процесса</CardTitle>
-                    <CardDescription className="break-words">
-                      Интерактивная BPMN-диаграмма бизнес-процесса
-                    </CardDescription>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Dialog open={changeRequestDialogOpen} onOpenChange={setChangeRequestDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button variant="default" size="sm" className="gap-2">
-                          <MessageSquarePlus className="w-4 h-4" />
-                          Запросить изменения
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                        <DialogHeader>
-                          <DialogTitle>Запросить изменения</DialogTitle>
-                          <DialogDescription>
-                            Опишите желаемые изменения в бизнес-процессе
-                          </DialogDescription>
-                        </DialogHeader>
-                        <ChangeRequestPanel 
-                          businessProcessId={processId} 
-                          onClose={() => {
-                            setChangeRequestDialogOpen(false);
-                            refetch();
-                          }}
-                        />
-                      </DialogContent>
-                    </Dialog>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setRegenerateDialogOpen(true)}
-                    >
-                      <RefreshCw className="w-4 h-4 mr-2" />
-                      Сгенерировать заново
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        toast.promise(exportProcessToPDF(process), {
-                          loading: "Генерация PDF...",
-                          success: "PDF успешно создан",
-                          error: "Ошибка при создании PDF",
-                        });
-                      }}
-                    >
-                      <Download className="w-4 h-4 mr-2" />
-                      PDF
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <ProcessDiagramSwimlane
-                  steps={process.steps || []}
-                  roles={process.roles || []}
-                  stages={process.stages || []}
-                  title="Кросс-функциональная схема (Swimlane)"
-                  editable={true}
-                  onStepUpdate={handleStepUpdate}
-                  onStepDelete={handleStepDelete}
-                />
-              </CardContent>
-            </Card>
+          {/* Вкладка Описание - полное текстовое описание процесса */}
+          <TabsContent value="description" className="mt-6">
+            <ProcessDescription process={{
+              ...process,
+              description: process.description || undefined,
+              startEvent: process.startEvent || undefined,
+              endEvent: process.endEvent || undefined,
+              totalTime: process.totalTime ? String(process.totalTime) : undefined,
+              totalCost: process.totalCost ? String(process.totalCost) : undefined,
+            }} />
           </TabsContent>
 
+          {/* Вкладка BPMN Диаграмма - визуальный редактор */}
           <TabsContent value="bpmn" className="mt-6">
             <Card>
               <CardHeader>
                 <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
                   <div className="flex-1 min-w-0">
-                    <CardTitle className="mb-2">Диаграмма бизнес-процесса</CardTitle>
+                    <CardTitle className="mb-2">BPMN 2.0 Диаграмма</CardTitle>
                     <CardDescription className="break-words">
-                      Интерактивный BPMN 2.0 редактор на базе bpmn.io. Поддерживает drag-and-drop, экспорт в BPMN XML и SVG.
+                      Интерактивный редактор бизнес-процесса в нотации BPMN 2.0. 
+                      Вы можете редактировать диаграмму, добавлять элементы и экспортировать результат.
                     </CardDescription>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Dialog open={changeRequestDialogOpen} onOpenChange={setChangeRequestDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button variant="default" size="sm" className="gap-2">
-                          <MessageSquarePlus className="w-4 h-4" />
-                          Запросить изменения
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                        <DialogHeader>
-                          <DialogTitle>Запросить изменения</DialogTitle>
-                          <DialogDescription>
-                            Опишите желаемые изменения в бизнес-процессе
-                          </DialogDescription>
-                        </DialogHeader>
-                        <ChangeRequestPanel 
-                          businessProcessId={processId} 
-                          onClose={() => {
-                            setChangeRequestDialogOpen(false);
-                            refetch();
-                          }}
-                        />
-                      </DialogContent>
-                    </Dialog>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setRegenerateDialogOpen(true)}
-                    >
-                      <RefreshCw className="w-4 h-4 mr-2" />
-                      Сгенерировать заново
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        toast.promise(exportProcessToPDF(process), {
-                          loading: "Генерация PDF...",
-                          success: "PDF успешно создан",
-                          error: "Ошибка при создании PDF",
-                        });
-                      }}
-                    >
-                      <Download className="w-4 h-4 mr-2" />
-                      PDF
-                    </Button>
                   </div>
                 </div>
               </CardHeader>
@@ -351,233 +206,11 @@ export default function ProcessView() {
                   editable={true}
                   height="700px"
                   onSave={(xml) => {
-                    // Сохраняем BPMN XML в БД
                     saveBpmnXmlMutation.mutate({ processId: process.id, bpmnXml: xml });
                   }}
                 />
               </CardContent>
             </Card>
-          </TabsContent>
-
-          <TabsContent value="stages" className="mt-6">
-            {(!process.stageDetails || process.stageDetails.length === 0) ? (
-              <Card>
-                <CardHeader className="text-center">
-                  <Sparkles className="w-12 h-12 mx-auto mb-4 text-primary" />
-                  <CardTitle>Детальное описание этапов еще не сгенерировано</CardTitle>
-                  <CardDescription>
-                    Нажмите кнопку ниже, чтобы ИИ создал подробное описание каждого этапа процесса
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="flex justify-center">
-                  <Button
-                    onClick={() => toast.info("Функция в разработке")}
-                    className="gap-2"
-                  >
-                    <Sparkles className="w-4 h-4" />
-                    Сгенерировать описание этапов
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <StageDetails
-                stages={process.stages || []}
-                stageDetails={process.stageDetails || []}
-              />
-            )}
-          </TabsContent>
-
-          <TabsContent value="metrics" className="mt-6">
-            {(!process.totalTime && !process.totalCost) ? (
-              <Card>
-                <CardHeader className="text-center">
-                  <Target className="w-12 h-12 mx-auto mb-4 text-primary" />
-                  <CardTitle>Метрики процесса еще не рассчитаны</CardTitle>
-                  <CardDescription>
-                    Нажмите кнопку ниже, чтобы ИИ рассчитал время выполнения и стоимость процесса
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="flex justify-center">
-                  <Button
-                    onClick={() => toast.info("Функция в разработке")}
-                    className="gap-2"
-                  >
-                    <Target className="w-4 h-4" />
-                    Рассчитать метрики
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <ProcessMetrics
-                totalTime={process.totalTime}
-                totalCost={process.totalCost}
-                salaryData={process.salaryData}
-              />
-            )}
-          </TabsContent>
-
-          <TabsContent value="funnels" className="mt-6">
-            {(!process.crmFunnels || process.crmFunnels.length === 0) ? (
-              <Card>
-                <CardHeader className="text-center">
-                  <TrendingUp className="w-12 h-12 mx-auto mb-4 text-primary" />
-                  <CardTitle>CRM воронки еще не созданы</CardTitle>
-                  <CardDescription>
-                    Нажмите кнопку ниже, чтобы ИИ создал воронки продаж для вашего процесса
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="flex justify-center">
-                  <Button
-                    onClick={() => toast.info("Функция в разработке")}
-                    className="gap-2"
-                  >
-                    <TrendingUp className="w-4 h-4" />
-                    Создать CRM воронки
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <CRMFunnels funnels={process.crmFunnels || []} />
-            )}
-          </TabsContent>
-
-          <TabsContent value="documents" className="mt-6">
-            <RequiredDocuments documents={process.requiredDocuments || []} />
-          </TabsContent>
-
-          <TabsContent value="details" className="mt-6 space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Этапы процесса</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {process.stages?.map((stage: any) => (
-                    <div key={stage.id} className="p-4 border rounded-lg">
-                      <h4 className="font-semibold mb-2">
-                        {stage.order}. {stage.name}
-                      </h4>
-                      <div className="space-y-2">
-                        {process.steps
-                          ?.filter((step: any) => step.stageId === stage.id)
-                          .map((step: any) => (
-                            <div key={step.id} className="pl-4 border-l-2 border-primary/30">
-                              <div className="font-medium text-sm">{step.name}</div>
-                              {step.tools && step.tools.length > 0 && (
-                                <div className="text-xs text-muted-foreground mt-1">
-                                  Инструменты: {step.tools.join(", ")}
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {process.itIntegration && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>ИТ-интеграция</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {process.itIntegration.crmStatuses && (
-                      <div>
-                        <h5 className="font-semibold mb-2">Статусы CRM</h5>
-                        <div className="flex flex-wrap gap-2">
-                          {process.itIntegration.crmStatuses.map((status: string, i: number) => (
-                            <Badge key={i} variant="secondary">
-                              {status}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {process.itIntegration.automations && (
-                      <div>
-                        <h5 className="font-semibold mb-2">Автоматизации</h5>
-                        <ul className="list-disc list-inside space-y-1 text-sm">
-                          {process.itIntegration.automations.map((auto: string, i: number) => (
-                            <li key={i}>{auto}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-
-          <TabsContent value="recommendations" className="mt-6">
-            {!recommendationsQuery.data || recommendationsQuery.data.length === 0 ? (
-              <Card>
-                <CardHeader className="text-center">
-                  <Sparkles className="w-12 h-12 mx-auto mb-4 text-primary" />
-                  <CardTitle>Рекомендации еще не сгенерированы</CardTitle>
-                  <CardDescription>
-                    Нажмите кнопку выше, чтобы ИИ проанализировал процесс и предложил улучшения
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-            ) : recommendationsQuery.isLoading ? (
-              <Card>
-                <CardContent className="py-12 text-center">
-                  <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
-                  <p className="text-muted-foreground">Загрузка рекомендаций...</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-4">
-                {recommendationsQuery.data?.map((rec) => {
-                  const Icon = categoryIcons[rec.category] || Sparkles;
-                  return (
-                    <Card key={rec.id}>
-                      <CardHeader>
-                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                          <div className="flex items-start gap-3 flex-1 min-w-0">
-                            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                              <Icon className="w-5 h-5 text-primary" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex flex-wrap items-center gap-2 mb-2">
-                                <CardTitle className="text-lg break-words">{rec.title}</CardTitle>
-                                <Badge variant={priorityColors[rec.priority] as any} className="whitespace-nowrap">
-                                  {rec.priority === "high"
-                                    ? "Высокий"
-                                    : rec.priority === "medium"
-                                    ? "Средний"
-                                    : "Низкий"}
-                                </Badge>
-                              </div>
-                              <Badge variant="outline" className="whitespace-nowrap">{categoryLabels[rec.category]}</Badge>
-                            </div>
-                          </div>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-muted-foreground mb-4 break-words">{rec.description}</p>
-                        {rec.toolsSuggested && rec.toolsSuggested.length > 0 && (
-                          <div>
-                            <div className="text-sm font-semibold mb-2">Рекомендуемые инструменты:</div>
-                            <div className="flex flex-wrap gap-2">
-                              {rec.toolsSuggested.map((tool: string, i: number) => (
-                                <Badge key={i} variant="secondary">
-                                  {tool}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
           </TabsContent>
         </Tabs>
       </main>
@@ -600,40 +233,20 @@ export default function ProcessView() {
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          
-          {isRegenerating && (
-            <div className="py-4">
-              <ProgressIndicator
-                stages={[
-                  { label: "Загрузка данных анкеты", duration: 2000 },
-                  { label: "Анализ требований", duration: 3000 },
-                  { label: "Генерация структуры процесса", duration: 8000 },
-                  { label: "Создание этапов и ролей", duration: 6000 },
-                  { label: "Формирование диаграммы", duration: 4000 },
-                  { label: "Завершение", duration: 2000 },
-                ]}
-              />
-            </div>
-          )}
-          
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isRegenerating}>Отмена</AlertDialogCancel>
             <AlertDialogAction
-              onClick={(e) => {
-                e.preventDefault();
-                handleRegenerate();
-              }}
+              onClick={handleRegenerate}
               disabled={isRegenerating}
-              className="gap-2"
             >
               {isRegenerating ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Генерация...
                 </>
               ) : (
                 <>
-                  <RefreshCw className="w-4 h-4" />
+                  <RefreshCw className="w-4 h-4 mr-2" />
                   Сгенерировать
                 </>
               )}

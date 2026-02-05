@@ -1,0 +1,55 @@
+{
+  "query": "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE();",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2caBidRtXS3CBxe.9f9b2212b9bd --database AtkYmgPLTEDMC5w2gAV6C3 --execute SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE();",
+  "rows": [
+    {
+      "TABLE_NAME": "__drizzle_migrations"
+    },
+    {
+      "TABLE_NAME": "users"
+    },
+    {
+      "TABLE_NAME": "businessProcesses"
+    },
+    {
+      "TABLE_NAME": "comments"
+    },
+    {
+      "TABLE_NAME": "companies"
+    },
+    {
+      "TABLE_NAME": "interviews"
+    },
+    {
+      "TABLE_NAME": "recommendations"
+    },
+    {
+      "TABLE_NAME": "documents"
+    },
+    {
+      "TABLE_NAME": "errorLogs"
+    },
+    {
+      "TABLE_NAME": "supportChats"
+    },
+    {
+      "TABLE_NAME": "supportMessages"
+    },
+    {
+      "TABLE_NAME": "faq_articles"
+    },
+    {
+      "TABLE_NAME": "verification_tokens"
+    },
+    {
+      "TABLE_NAME": "change_requests"
+    },
+    {
+      "TABLE_NAME": "process_versions"
+    }
+  ],
+  "messages": [],
+  "stdout": "TABLE_NAME\n__drizzle_migrations\nusers\nbusinessProcesses\ncomments\ncompanies\ninterviews\nrecommendations\ndocuments\nerrorLogs\nsupportChats\nsupportMessages\nfaq_articles\nverification_tokens\nchange_requests\nprocess_versions\n",
+  "stderr": "",
+  "execution_time_ms": 350
+}
